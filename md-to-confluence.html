@@ -892,7 +892,8 @@
        */
       function validateXhtml(xhtml) {
         const parser = new DOMParser();
-        const wrapped = `<root>${xhtml}</root>`;
+        const wrapped =
+          `<root xmlns:ac="http://atlassian.com/content" xmlns:ri="http://atlassian.com/rdf">${xhtml}</root>`;
         const doc = parser.parseFromString(wrapped, 'application/xml');
         const parserError = doc.getElementsByTagName('parsererror')[0];
         if (parserError) {
@@ -1107,10 +1108,12 @@
         }
       }
 
-      convertBtn.addEventListener('click', () => {
-        handleConvert();
-        persistInput();
-      });
+      if (convertBtn) {
+        convertBtn.addEventListener('click', () => {
+          handleConvert();
+          persistInput();
+        });
+      }
 
       copyBtn.addEventListener('click', copyOutput);
       downloadBtn.addEventListener('click', downloadOutput);
@@ -1120,6 +1123,18 @@
       markdownInput.addEventListener('input', () => {
         updateCount();
         persistInput();
+      });
+
+      markdownInput.addEventListener('paste', () => {
+        const schedule =
+          typeof window.requestAnimationFrame === 'function'
+            ? window.requestAnimationFrame.bind(window)
+            : (cb) => setTimeout(cb, 0);
+        schedule(() => {
+          updateCount();
+          persistInput();
+          handleConvert();
+        });
       });
 
       markdownInput.addEventListener('keydown', (event) => {
