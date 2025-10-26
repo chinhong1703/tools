@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Markdown → Confluence XHTML Converter</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f9;
+      --panel-bg: #ffffff;
+      --text: #1f2933;
+      --muted: #5f6b7a;
+      --accent: #2563eb;
+      --accent-contrast: #ffffff;
+      --border: #d2d6dc;
+      --danger: #b91c1c;
+      --success: #047857;
+      font-size: 16px;
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.5rem clamp(1rem, 3vw, 3rem);
+      background: linear-gradient(120deg, #0f172a, #1d4ed8, #22d3ee);
+      color: #fff;
+    }
+
+    header h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: 0.01em;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 60ch;
+      opacity: 0.85;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: clamp(1rem, 2vw, 2.5rem);
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 12px 24px -16px rgba(15, 23, 42, 0.35);
+    }
+
+    .panel header {
+      background: none;
+      color: inherit;
+      padding: 1rem 1.25rem 0.25rem;
+    }
+
+    .panel header h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .panel header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    textarea,
+    .preview-surface {
+      flex: 1;
+      width: 100%;
+      border: none;
+      resize: vertical;
+      padding: 1rem 1.25rem;
+      font: 0.95rem/1.6 "Fira Code", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      border-radius: 0 0 0.75rem 0.75rem;
+      background: transparent;
+      color: inherit;
+      outline: none;
+    }
+
+    textarea:focus-visible,
+    .preview-surface:focus-visible {
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    textarea[readonly] {
+      background: rgba(37, 99, 235, 0.05);
+      color: inherit;
+    }
+
+    .preview-surface {
+      display: flex;
+      flex-direction: column;
+      background: rgba(15, 23, 42, 0.03);
+      border-radius: 0 0 0.75rem 0.75rem;
+      overflow: auto;
+      font-family: "Inter", "Segoe UI", sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: inherit;
+    }
+
+    .preview-surface iframe {
+      border: none;
+      width: 100%;
+      min-height: 100%;
+    }
+
+    .textarea-footer {
+      padding: 0.5rem 1.25rem 1rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    button {
+      border: none;
+      border-radius: 0.5rem;
+      padding: 0.6rem 1.1rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+      background: var(--accent);
+      color: var(--accent-contrast);
+      min-width: 8.5rem;
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    button.danger {
+      background: #fee2e2;
+      color: var(--danger);
+    }
+
+    button:hover,
+    button:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px -12px rgba(37, 99, 235, 0.6);
+    }
+
+    button.secondary:hover,
+    button.secondary:focus-visible {
+      box-shadow: 0 8px 18px -12px rgba(17, 24, 39, 0.35);
+    }
+
+    button.danger:hover,
+    button.danger:focus-visible {
+      box-shadow: 0 8px 18px -12px rgba(185, 28, 28, 0.45);
+    }
+
+    details {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.32);
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      outline: none;
+    }
+
+    summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    details ul {
+      margin-top: 0.75rem;
+      padding-left: 1.2rem;
+      color: var(--muted);
+    }
+
+    details li {
+      margin-bottom: 0.4rem;
+    }
+
+    footer {
+      padding: 0.75rem clamp(1rem, 3vw, 3rem);
+      font-size: 0.9rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .status {
+      min-height: 1.4rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .test-results {
+      font-family: "Fira Code", monospace;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      color: var(--muted);
+    }
+
+    .toolbar-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    @media (min-width: 768px) {
+      .toolbar-row {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+
+    .toolbar-row h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: rgba(37, 99, 235, 0.95);
+      color: #fff;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      box-shadow: 0 10px 25px -18px rgba(15, 23, 42, 0.6);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(1rem);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-width: 320px;
+      z-index: 20;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    a.inline-link {
+      color: var(--accent);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Markdown → Confluence XHTML Converter</h1>
+    <p>Paste or type Markdown on the left, then convert it into Confluence Storage Format XHTML ready for copy, download, and sharing.</p>
+  </header>
+  <main>
+    <section class="panels" aria-label="Editor panels">
+      <article class="panel" aria-labelledby="markdown-label">
+        <header>
+          <h2 id="markdown-label">Markdown Input</h2>
+          <p>Supports a practical subset including headings, lists, tables, blockquotes, code blocks, and inline formatting.</p>
+        </header>
+        <textarea id="markdown-input" placeholder="Type Markdown here…" aria-describedby="markdown-count" spellcheck="false"></textarea>
+        <div class="textarea-footer" id="markdown-count">0 characters</div>
+      </article>
+      <article class="panel" aria-labelledby="xhtml-label">
+        <header>
+          <h2 id="xhtml-label">Confluence XHTML Output</h2>
+          <p>Read-only storage format markup, validated as XML before display.</p>
+        </header>
+        <textarea id="xhtml-output" readonly aria-label="Confluence XHTML output" spellcheck="false"></textarea>
+        <div class="textarea-footer">XML-safe output generated from Markdown.</div>
+      </article>
+      <article class="panel" aria-labelledby="preview-label">
+        <header>
+          <h2 id="preview-label">Rendered HTML Preview</h2>
+          <p>Live rendering of the converted XHTML for quick visual inspection.</p>
+        </header>
+        <div class="preview-surface" tabindex="0" aria-live="polite" aria-label="Converted HTML preview">
+          <iframe id="xhtml-preview" title="Converted XHTML preview" sandbox="allow-popups"></iframe>
+        </div>
+        <div class="textarea-footer">Preview updates after each conversion.</div>
+      </article>
+    </section>
+    <section class="toolbar-row" aria-label="Conversion controls">
+      <h3>Conversion Controls</h3>
+      <div class="toolbar">
+        <button id="convert-btn" type="button">Convert</button>
+        <button id="copy-btn" type="button" class="secondary">Copy Output</button>
+        <button id="download-btn" type="button" class="secondary">Download .xml</button>
+        <button id="clear-btn" type="button" class="danger">Clear</button>
+        <button id="tests-btn" type="button" class="secondary">Run Tests</button>
+      </div>
+    </section>
+    <details>
+      <summary>Converter Notes &amp; Supported Syntax</summary>
+      <ul>
+        <li>Headings <code>#</code> through <code>######</code> map to <code>&lt;h1&gt;</code>…<code>&lt;h6&gt;</code>.</li>
+        <li>Paragraphs become <code>&lt;p&gt;</code>; trailing double spaces add <code>&lt;br/&gt;</code> within the paragraph.</li>
+        <li>Inline formatting: <code>**bold**</code>, <code>*italic*</code>/<code>_italic_</code>, <code>~~strike~~</code>, and <code>`code`</code>.</li>
+        <li>Links and images render as Confluence anchors and <code>&lt;ac:image&gt;</code> macros (images use plain text body for the alt text).</li>
+        <li>Fenced code blocks convert into Confluence <code>&lt;ac:structured-macro ac:name="code"&gt;</code> macros with language detection.</li>
+        <li>Blockquotes, nested lists (ordered and unordered), horizontal rules, and tables with alignment markers are supported.</li>
+        <li>Task lists (<code>- [ ]</code> / <code>- [x]</code>) render as Confluence task lists when all items are tasks; nested tasks fall back to regular list items.</li>
+        <li>Conversion runs entirely in your browser and validates output for well-formed XML before display.</li>
+      </ul>
+    </details>
+  </main>
+  <footer>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <div class="test-results" id="test-results" aria-live="polite"></div>
+  </footer>
+  <div class="toast" role="alert" aria-live="assertive" id="toast"></div>
+  <script>
+    (() => {
+      'use strict';
+
+      /**
+       * Escape XML special characters for element text nodes.
+       * @param {string} value
+       * @returns {string}
+       */
+      function escapeXml(value) {
+        return value.replace(/[&<>"']/g, (ch) => {
+          switch (ch) {
+            case '&':
+              return '&amp;';
+            case '<':
+              return '&lt;';
+            case '>':
+              return '&gt;';
+            case '"':
+              return '&quot;';
+            case '\'':
+              return '&apos;';
+            default:
+              return ch;
+          }
+        });
+      }
+
+      /**
+       * Escape XML special characters for attribute contexts.
+       * @param {string} value
+       * @returns {string}
+       */
+      function escapeAttribute(value) {
+        return escapeXml(value).replace(/\s+/g, (segment) => segment.replace(/\s/g, ' '));
+      }
+
+      /**
+       * Sanitize CDATA content by splitting <code>]]&gt;</code> sequences.
+       * @param {string} value
+       * @returns {string}
+       */
+      function cdataSafe(value) {
+        return value.replace(/]]>/g, ']]]]><![CDATA[>');
+      }
+
+      /**
+       * Normalize line endings to Unix newlines.
+       * @param {string} text
+       * @returns {string}
+       */
+      function normalizeNewlines(text) {
+        return text.replace(/\r\n?/g, '\n');
+      }
+
+      /**
+       * Tokenize Markdown input into block-level tokens.
+       * @param {string} markdown
+       * @returns {Array}
+       */
+      function markdownToTokens(markdown) {
+        const tokens = [];
+        const lines = normalizeNewlines(markdown).split('\n');
+        let i = 0;
+
+        /** Flush paragraph lines into a paragraph token. */
+        function flushParagraph(paragraphLines) {
+          if (!paragraphLines.length) return;
+          tokens.push({ type: 'paragraph', lines: paragraphLines.slice() });
+          paragraphLines.length = 0;
+        }
+
+        let paragraphLines = [];
+
+        const listPattern = /^(\s*)([*+-]|\d+\.)\s+(.*)$/;
+        const blockquotePattern = /^\s*>+/;
+
+        while (i < lines.length) {
+          let line = lines[i];
+          const trimmed = line.trim();
+
+          // Blank line
+          if (!trimmed) {
+            flushParagraph(paragraphLines);
+            i += 1;
+            continue;
+          }
+
+          // Code fence
+          const fenceMatch = line.match(/^\s*(```|~~~)([^`~\s]*)?\s*$/);
+          if (fenceMatch) {
+            flushParagraph(paragraphLines);
+            const fence = fenceMatch[1];
+            const language = fenceMatch[2] ? fenceMatch[2].trim() : '';
+            i += 1;
+            const codeLines = [];
+            const closingPattern = new RegExp(`^\\s*${fence}\\s*$`);
+            while (i < lines.length && !closingPattern.test(lines[i])) {
+              codeLines.push(lines[i]);
+              i += 1;
+            }
+            if (i < lines.length) {
+              i += 1; // consume closing fence
+            }
+            tokens.push({ type: 'code', language, content: codeLines.join('\n') });
+            continue;
+          }
+
+          // Table detection (header + alignment row)
+          const nextLine = lines[i + 1] || '';
+          if (line.includes('|') && /^\s*\|?\s*:?-{3,}:?/.test(nextLine)) {
+            flushParagraph(paragraphLines);
+            const table = parseTable(lines, i);
+            tokens.push(table.token);
+            i = table.nextIndex;
+            continue;
+          }
+
+          // Heading
+          const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+          if (headingMatch) {
+            flushParagraph(paragraphLines);
+            tokens.push({
+              type: 'heading',
+              level: headingMatch[1].length,
+              text: headingMatch[2].trim()
+            });
+            i += 1;
+            continue;
+          }
+
+          // Horizontal rule
+          if (/^\s*(\*\s*\*\s*\*|-\s*-\s*-|_\s*_\s*_)\s*$/.test(line)) {
+            flushParagraph(paragraphLines);
+            tokens.push({ type: 'hr' });
+            i += 1;
+            continue;
+          }
+
+          // Blockquote
+          if (blockquotePattern.test(line)) {
+            flushParagraph(paragraphLines);
+            const block = parseBlockquote(lines, i);
+            tokens.push(block.token);
+            i = block.nextIndex;
+            continue;
+          }
+
+          // List block
+          if (listPattern.test(line)) {
+            flushParagraph(paragraphLines);
+            const list = parseList(lines, i);
+            tokens.push(...list.tokens);
+            i = list.nextIndex;
+            continue;
+          }
+
+          // Accumulate paragraph lines
+          paragraphLines.push(line);
+          i += 1;
+        }
+
+        flushParagraph(paragraphLines);
+        return tokens;
+      }
+
+      /**
+       * Parse pipe table block starting at index.
+       * @param {string[]} lines
+       * @param {number} start
+       * @returns {{token: object, nextIndex: number}}
+       */
+      function parseTable(lines, start) {
+        const headerLine = lines[start];
+        const alignLine = lines[start + 1] || '';
+
+        function splitRow(row) {
+          const trimmed = row.trim();
+          const cleaned = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+          return cleaned.split('|').map((cell) => cell.trim());
+        }
+
+        const headers = splitRow(headerLine);
+        const alignments = splitRow(alignLine).map((cell) => {
+          const left = cell.startsWith(':');
+          const right = cell.endsWith(':');
+          if (left && right) return 'center';
+          if (left) return 'left';
+          if (right) return 'right';
+          return '';
+        });
+
+        const rows = [];
+        let idx = start + 2;
+        while (idx < lines.length) {
+          const rowLine = lines[idx];
+          if (!rowLine.trim() || !rowLine.includes('|')) break;
+          rows.push(splitRow(rowLine));
+          idx += 1;
+        }
+
+        return {
+          token: { type: 'table', headers, alignments, rows },
+          nextIndex: idx
+        };
+      }
+
+      /**
+       * Parse blockquote block.
+       * @param {string[]} lines
+       * @param {number} start
+       * @returns {{token: object, nextIndex: number}}
+       */
+      function parseBlockquote(lines, start) {
+        const quoteLines = [];
+        let idx = start;
+        const pattern = /^\s*>\s?/;
+        while (idx < lines.length) {
+          const line = lines[idx];
+          if (!/^\s*>/.test(line)) break;
+          quoteLines.push(line.replace(pattern, ''));
+          idx += 1;
+        }
+        const innerTokens = markdownToTokens(quoteLines.join('\n'));
+        return {
+          token: { type: 'blockquote', children: innerTokens },
+          nextIndex: idx
+        };
+      }
+
+      /**
+       * Parse list block including nesting.
+       * @param {string[]} lines
+       * @param {number} start
+       * @returns {{tokens: Array, nextIndex: number}}
+       */
+      function parseList(lines, start) {
+        const listPattern = /^(\s*)([*+-]|\d+\.)\s+(.*)$/;
+        const continuationPattern = /^(\s+)(.*)$/;
+        const rootLists = [];
+        const stack = [];
+
+        let idx = start;
+        let previousIndent = null;
+
+        function closeToDepth(targetDepth) {
+          while (stack.length > targetDepth) {
+            const level = stack.pop();
+            const listToken = {
+              type: 'list',
+              order: level.order,
+              items: level.items
+            };
+            if (stack.length > 0) {
+              const parentLevel = stack[stack.length - 1];
+              const parentItem = parentLevel.items[parentLevel.items.length - 1];
+              if (!parentItem.children) parentItem.children = [];
+              parentItem.children.push(listToken);
+            } else {
+              rootLists.push(listToken);
+            }
+          }
+        }
+
+        function getDepthFromIndent(indentStr) {
+          const indentWidth = indentStr.replace(/\t/g, '    ').length;
+          return Math.floor(indentWidth / 2);
+        }
+
+        while (idx < lines.length) {
+          const line = lines[idx];
+          if (!line.trim()) break;
+
+          const listMatch = line.match(listPattern);
+          if (!listMatch) {
+            if (previousIndent !== null) {
+              const continuation = line.match(continuationPattern);
+              if (continuation) {
+                const depth = Math.min(stack.length - 1, getDepthFromIndent(continuation[1]));
+                if (depth >= 0 && stack[depth]) {
+                  const level = stack[depth];
+                  const currentItem = level.items[level.items.length - 1];
+                  if (currentItem) {
+                    currentItem.textLines.push(continuation[2]);
+                    idx += 1;
+                    continue;
+                  }
+                }
+              }
+            }
+            break;
+          }
+
+          const indent = listMatch[1];
+          const marker = listMatch[2];
+          const content = listMatch[3];
+          const depth = getDepthFromIndent(indent);
+          const order = /\d+\./.test(marker) ? 'ol' : 'ul';
+
+          const desiredLength = depth + 1;
+
+          if (stack.length > desiredLength) {
+            closeToDepth(desiredLength);
+          }
+
+          if (stack.length < desiredLength) {
+            while (stack.length < desiredLength) {
+              const newOrder = stack.length === desiredLength - 1 ? order : 'ul';
+              stack.push({ order: newOrder, items: [] });
+            }
+          } else {
+            const currentLevel = stack[desiredLength - 1];
+            if (currentLevel.order !== order) {
+              closeToDepth(desiredLength - 1);
+              while (stack.length < desiredLength) {
+                const newOrder = stack.length === desiredLength - 1 ? order : 'ul';
+                stack.push({ order: newOrder, items: [] });
+              }
+            }
+          }
+
+          const currentLevel = stack[stack.length - 1];
+          const taskMatch = content.match(/^\[( |x|X)\]\s+(.*)$/);
+          const item = {
+            type: 'listItem',
+            textLines: [taskMatch ? taskMatch[2] : content],
+            children: [],
+            task: taskMatch ? (taskMatch[1].toLowerCase() === 'x' ? 'complete' : 'incomplete') : null
+          };
+          currentLevel.items.push(item);
+          previousIndent = indent;
+          idx += 1;
+        }
+
+        closeToDepth(0);
+        closeToDepth(0);
+
+        let nextIndex = idx;
+        return { tokens: rootLists, nextIndex };
+      }
+
+      /**
+       * Convert tokens array into Confluence XHTML.
+       * @param {Array} tokens
+       * @returns {string}
+       */
+      function tokensToXhtml(tokens) {
+        let parts = [];
+
+        function renderTokens(list) {
+          for (const token of list) {
+            switch (token.type) {
+              case 'heading':
+                parts.push(`<h${token.level}>${parseInline(token.text)}</h${token.level}>`);
+                break;
+              case 'paragraph':
+                parts.push(renderParagraph(token.lines));
+                break;
+              case 'code':
+                parts.push(renderCodeBlock(token));
+                break;
+              case 'blockquote':
+                parts.push(`<blockquote>${renderInner(token.children)}</blockquote>`);
+                break;
+              case 'list':
+                parts.push(renderList(token));
+                break;
+              case 'hr':
+                parts.push('<hr/>');
+                break;
+              case 'table':
+                parts.push(renderTable(token));
+                break;
+              default:
+                break;
+            }
+          }
+        }
+
+        function renderInner(childTokens) {
+          const innerParts = [];
+          const outerParts = parts;
+          parts = innerParts;
+          renderTokens(childTokens);
+          parts = outerParts;
+          return innerParts.join('');
+        }
+
+        renderTokens(tokens);
+        return parts.join('\n');
+      }
+
+      /**
+       * Render paragraph lines to XHTML.
+       * @param {string[]} lines
+       * @returns {string}
+       */
+      function renderParagraph(lines) {
+        const pieces = [];
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i];
+          const hasBreak = /\s{2}$/.test(line);
+          const trimmedLine = hasBreak ? line.replace(/\s{2}$/, '') : line;
+          pieces.push(parseInline(trimmedLine));
+          if (hasBreak) {
+            pieces.push('<br/>');
+          } else if (i < lines.length - 1) {
+            pieces.push('<br/>');
+          }
+        }
+        const html = pieces.join('');
+        return `<p>${html}</p>`;
+      }
+
+      /**
+       * Render Confluence code macro for fenced blocks.
+       * @param {{language: string, content: string}} token
+       * @returns {string}
+       */
+      function renderCodeBlock(token) {
+        const language = token.language ? `<ac:parameter ac:name="language">${escapeXml(token.language)}</ac:parameter>\n` : '';
+        const content = cdataSafe(token.content);
+        return `<ac:structured-macro ac:name="code">\n${language}  <ac:plain-text-body><![CDATA[\n${content}\n  ]]></ac:plain-text-body>\n</ac:structured-macro>`;
+      }
+
+      /**
+       * Render list token into XHTML.
+       * @param {{order: string, items: Array}} token
+       * @returns {string}
+       */
+      function renderList(token) {
+        const allTasks = token.order === 'ul' && token.items.every((item) => item.task && (!item.children || item.children.length === 0));
+        if (allTasks) {
+          const items = token.items.map((item) => `  <ac:task>\n    <ac:task-status>${item.task}</ac:task-status>\n    <ac:task-body>${parseInline(item.textLines.join(' '))}${renderChildBlocks(item.children)}</ac:task-body>\n  </ac:task>`);
+          return `<ac:task-list>\n${items.join('\n')}\n</ac:task-list>`;
+        }
+        const tag = token.order === 'ol' ? 'ol' : 'ul';
+        const items = token.items.map((item) => `<li>${parseInline(item.textLines.join(' '))}${renderChildBlocks(item.children)}</li>`);
+        return `<${tag}>${items.join('')}</${tag}>`;
+      }
+
+      /**
+       * Render nested blocks for list items.
+       * @param {Array} children
+       * @returns {string}
+       */
+      function renderChildBlocks(children) {
+        if (!children || !children.length) return '';
+        return children.map((child) => {
+          switch (child.type) {
+            case 'list':
+              return renderList(child);
+            default:
+              return tokensToXhtml([child]);
+          }
+        }).join('');
+      }
+
+      /**
+       * Render table token.
+       * @param {{headers: string[], alignments: string[], rows: string[][]}} token
+       * @returns {string}
+       */
+      function renderTable(token) {
+        const cols = token.headers.length;
+        const colgroup = new Array(cols).fill('<col/>').join('');
+        const headerCells = token.headers.map((cell, idx) => {
+          const align = token.alignments[idx] ? ` style="text-align:${token.alignments[idx]}"` : '';
+          return `<th${align}>${parseInline(cell)}</th>`;
+        }).join('');
+        const head = `<thead><tr>${headerCells}</tr></thead>`;
+        const bodyRows = token.rows.map((row) => {
+          const cells = row.map((cell, idx) => {
+            const align = token.alignments[idx] ? ` style="text-align:${token.alignments[idx]}"` : '';
+            return `<td${align}>${parseInline(cell)}</td>`;
+          }).join('');
+          return `<tr>${cells}</tr>`;
+        }).join('');
+        const body = `<tbody>${bodyRows}</tbody>`;
+        return `<table>\n  <colgroup>${colgroup}</colgroup>\n  ${head}\n  ${body}\n</table>`;
+      }
+
+      /**
+       * Parse inline Markdown to XHTML.
+       * @param {string} text
+       * @param {{allowLinks?: boolean}} options
+       * @returns {string}
+       */
+      function parseInline(text, options = { allowLinks: true }) {
+        if (!text) return '';
+        const codeStore = [];
+        const imageStore = [];
+        const linkStore = [];
+        const codePlaceholder = '\u0000CODE';
+        const imagePlaceholder = '\u0000IMG';
+        const linkPlaceholder = '\u0000LNK';
+
+        const codeRegex = /(`+)([\s\S]*?)\1/g;
+        text = text.replace(codeRegex, (match, ticks, content) => {
+          const index = codeStore.length;
+          codeStore.push(content);
+          return `${codePlaceholder}${index}\u0000`;
+        });
+
+        text = text.replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)/g, (match, alt, src, title) => {
+          const index = imageStore.length;
+          imageStore.push({ alt, src, title: title || '' });
+          return `${imagePlaceholder}${index}\u0000`;
+        });
+
+        if (options.allowLinks) {
+          text = text.replace(/\[([^\]]+)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)/g, (match, label, href, title) => {
+            const index = linkStore.length;
+            linkStore.push({ label, href, title: title || '' });
+            return `${linkPlaceholder}${index}\u0000`;
+          });
+        }
+
+        text = escapeXml(text);
+
+        text = text.replace(/~~(.*?)~~/g, '<del>$1</del>');
+        text = text.replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>');
+        text = text.replace(/(\*|_)(.+?)\1/g, '<em>$2</em>');
+
+        text = text.replace(new RegExp(`${codePlaceholder}(\d+)\u0000`, 'g'), (match, idx) => {
+          const content = escapeXml(codeStore[Number(idx)] || '');
+          return `<code>${content}</code>`;
+        });
+
+        text = text.replace(new RegExp(`${imagePlaceholder}(\d+)\u0000`, 'g'), (match, idx) => {
+          const image = imageStore[Number(idx)] || { alt: '', src: '', title: '' };
+          const plainTextAlt = cdataSafe(image.alt || '');
+          const titleAttr = image.title ? ` title="${escapeAttribute(image.title)}"` : '';
+          return `<ac:image${titleAttr}><ri:url ri:value="${escapeAttribute(image.src)}"/><ac:plain-text-link-body><![CDATA[${plainTextAlt}]]></ac:plain-text-link-body></ac:image>`;
+        });
+
+        text = text.replace(new RegExp(`${linkPlaceholder}(\d+)\u0000`, 'g'), (match, idx) => {
+          const link = linkStore[Number(idx)] || { label: '', href: '', title: '' };
+          const label = parseInline(link.label, { allowLinks: false });
+          const titleAttr = link.title ? ` title="${escapeAttribute(link.title)}"` : '';
+          return `<a href="${escapeAttribute(link.href)}"${titleAttr}>${label}</a>`;
+        });
+
+        return text;
+      }
+
+      /**
+       * Validate XHTML string is well-formed XML.
+       * @param {string} xhtml
+       * @returns {{valid: boolean, error?: string}}
+       */
+      function validateXhtml(xhtml) {
+        const parser = new DOMParser();
+        const wrapped =
+          `<root xmlns:ac="http://atlassian.com/content" xmlns:ri="http://atlassian.com/rdf">${xhtml}</root>`;
+        const doc = parser.parseFromString(wrapped, 'application/xml');
+        const parserError = doc.getElementsByTagName('parsererror')[0];
+        if (parserError) {
+          const errorMessage = parserError.textContent.replace(/\s+/g, ' ').trim();
+          return { valid: false, error: errorMessage };
+        }
+        return { valid: true };
+      }
+
+      /**
+       * Run built-in converter tests.
+       * @param {function(string): string} convertFn
+       * @returns {{passed: number, failed: number, failures: Array}}
+       */
+      function runConverterTests(convertFn) {
+        const cases = [
+          {
+            name: 'Headings & emphasis',
+            md: '# Title\nSome **bold** and *italic* text.\n',
+            expected: '<h1>Title</h1>\n<p>Some <strong>bold</strong> and <em>italic</em> text.</p>'
+          },
+          {
+            name: 'List nesting',
+            md: '- A\n  - B\n  - C\n1. One\n2. Two\n',
+            expected: '<ul><li>A<ul><li>B</li><li>C</li></ul></li></ul>\n<ol><li>One</li><li>Two</li></ol>'
+          },
+          {
+            name: 'Code fences with language',
+            md: '```js\nconst x = 1 < 2 && 3 > 2;\n```\n',
+            expected: '<ac:structured-macro ac:name="code">\n<ac:parameter ac:name="language">js</ac:parameter>\n  <ac:plain-text-body><![CDATA[\nconst x = 1 < 2 && 3 > 2;\n  ]]></ac:plain-text-body>\n</ac:structured-macro>'
+          },
+          {
+            name: 'Blockquote + HR',
+            md: '> Quote\n\n---\n',
+            expected: '<blockquote><p>Quote</p></blockquote>\n<hr/>'
+          },
+          {
+            name: 'Table with alignment',
+            md: '| Name | Qty | Price |\n|:-----|:---:|-----:|\n| Apple|  2  | 1.20  |\n',
+            expected: '<table>\n  <colgroup><col/><col/><col/></colgroup>\n  <thead><tr><th style="text-align:left">Name</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th></tr></thead>\n  <tbody><tr><td style="text-align:left">Apple</td><td style="text-align:center">2</td><td style="text-align:right">1.20</td></tr></tbody>\n</table>'
+          },
+          {
+            name: 'Task list',
+            md: '- [x] Done\n- [ ] Todo\n',
+            expected: '<ac:task-list>\n  <ac:task>\n    <ac:task-status>complete</ac:task-status>\n    <ac:task-body>Done</ac:task-body>\n  </ac:task>\n  <ac:task>\n    <ac:task-status>incomplete</ac:task-status>\n    <ac:task-body>Todo</ac:task-body>\n  </ac:task>\n</ac:task-list>'
+          }
+        ];
+
+        let passed = 0;
+        let failed = 0;
+        const failures = [];
+
+        for (const testCase of cases) {
+          const result = convertFn(testCase.md).trim();
+          const expected = testCase.expected.trim();
+          if (result === expected) {
+            passed += 1;
+          } else {
+            failed += 1;
+            failures.push({ name: testCase.name, expected, result });
+          }
+        }
+
+        return { passed, failed, failures };
+      }
+
+      /**
+       * Convert Markdown string to Confluence XHTML.
+       * @param {string} markdown
+       * @returns {string}
+       */
+      function convert(markdown) {
+        if (!markdown.trim()) return '';
+        const tokens = markdownToTokens(markdown);
+        return tokensToXhtml(tokens).trim();
+      }
+
+      // DOM bindings
+      const markdownInput = document.getElementById('markdown-input');
+      const xhtmlOutput = document.getElementById('xhtml-output');
+      const convertBtn = document.getElementById('convert-btn');
+      const copyBtn = document.getElementById('copy-btn');
+      const downloadBtn = document.getElementById('download-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const testsBtn = document.getElementById('tests-btn');
+      const previewFrame = document.getElementById('xhtml-preview');
+      const statusEl = document.getElementById('status');
+      const toastEl = document.getElementById('toast');
+      const testResultsEl = document.getElementById('test-results');
+      const countEl = document.getElementById('markdown-count');
+
+      const STORAGE_KEY = 'md-to-confluence:last-markdown';
+
+      function updateCount() {
+        const count = markdownInput.value.length;
+        countEl.textContent = `${count.toLocaleString()} character${count === 1 ? '' : 's'}`;
+      }
+
+      function setStatus(message, type = 'neutral') {
+        statusEl.textContent = message;
+        statusEl.className = `status${type === 'success' ? ' success' : type === 'error' ? ' error' : ''}`;
+      }
+
+      function showToast(message) {
+        toastEl.textContent = message;
+        toastEl.classList.add('visible');
+        setTimeout(() => {
+          toastEl.classList.remove('visible');
+        }, 1800);
+      }
+
+      function persistInput() {
+        try {
+          localStorage.setItem(STORAGE_KEY, markdownInput.value);
+        } catch (error) {
+          console.warn('Failed to persist Markdown content', error);
+        }
+      }
+
+      function restoreInput() {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            markdownInput.value = stored;
+            updateCount();
+          }
+        } catch (error) {
+          console.warn('Failed to restore Markdown content', error);
+        }
+      }
+
+      function updatePreview(xhtml) {
+        if (!previewFrame) return;
+        const html = xhtml.trim();
+        if (!html) {
+          previewFrame.removeAttribute('srcdoc');
+          return;
+        }
+        const previewDocument = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><base target="_blank" /><style>body{font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:1rem;color:#0f172a;background:#f9fafb;line-height:1.6;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #d1d5db;padding:0.4rem 0.6rem;}code{font-family:'Fira Code','SFMono-Regular',Menlo,monospace;background:rgba(15,23,42,0.08);padding:0.1rem 0.25rem;border-radius:0.25rem;}pre{background:rgba(15,23,42,0.08);padding:0.75rem;border-radius:0.5rem;overflow:auto;}</style></head><body>${html}</body></html>`;
+        previewFrame.setAttribute('srcdoc', previewDocument);
+      }
+
+      function handleConvert() {
+        const source = markdownInput.value;
+        const xhtml = convert(source);
+        if (!xhtml && !source.trim()) {
+          xhtmlOutput.value = '';
+          updatePreview('');
+          setStatus('Enter Markdown to convert.');
+          return;
+        }
+        const validation = validateXhtml(xhtml);
+        if (!validation.valid) {
+          xhtmlOutput.value = xhtml;
+          updatePreview(xhtml);
+          setStatus(`XML validation failed: ${validation.error}`, 'error');
+          return;
+        }
+        xhtmlOutput.value = xhtml;
+        updatePreview(xhtml);
+        setStatus('Conversion successful. Output is valid XML.', 'success');
+      }
+
+      async function copyOutput() {
+        const value = xhtmlOutput.value;
+        if (!value) {
+          setStatus('No output to copy.', 'error');
+          return;
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = value;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+          }
+          showToast('XHTML copied to clipboard.');
+          setStatus('Output copied to clipboard.', 'success');
+        } catch (error) {
+          console.error(error);
+          setStatus('Copy failed: clipboard not available.', 'error');
+        }
+      }
+
+      function downloadOutput() {
+        const value = xhtmlOutput.value;
+        if (!value) {
+          setStatus('No output to download.', 'error');
+          return;
+        }
+        const blob = new Blob([value], { type: 'application/xml' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'confluence.xhtml.xml';
+        anchor.click();
+        URL.revokeObjectURL(url);
+        setStatus('Download ready.', 'success');
+      }
+
+      function clearAll() {
+        markdownInput.value = '';
+        xhtmlOutput.value = '';
+        updatePreview('');
+        updateCount();
+        setStatus('Cleared Markdown and output fields.');
+        persistInput();
+        testResultsEl.textContent = '';
+      }
+
+      function runTests() {
+        const results = runConverterTests(convert);
+        if (results.failed === 0) {
+          testResultsEl.textContent = `All ${results.passed} test cases passed.`;
+          setStatus('All converter tests passed.', 'success');
+        } else {
+          const failure = results.failures[0];
+          testResultsEl.textContent = `${results.passed} passed, ${results.failed} failed. First failure: ${failure.name}`;
+          console.warn('Test failure diff', failure);
+          setStatus('Some converter tests failed. Check console for details.', 'error');
+        }
+      }
+
+      if (convertBtn) {
+        convertBtn.addEventListener('click', () => {
+          handleConvert();
+          persistInput();
+        });
+      }
+
+      copyBtn.addEventListener('click', copyOutput);
+      downloadBtn.addEventListener('click', downloadOutput);
+      clearBtn.addEventListener('click', clearAll);
+      testsBtn.addEventListener('click', runTests);
+
+      markdownInput.addEventListener('input', () => {
+        updateCount();
+        persistInput();
+      });
+
+      markdownInput.addEventListener('paste', () => {
+        const schedule =
+          typeof window.requestAnimationFrame === 'function'
+            ? window.requestAnimationFrame.bind(window)
+            : (cb) => setTimeout(cb, 0);
+        schedule(() => {
+          updateCount();
+          persistInput();
+          handleConvert();
+        });
+      });
+
+      markdownInput.addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault();
+          handleConvert();
+        }
+      });
+
+      xhtmlOutput.addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
+          event.preventDefault();
+          copyOutput();
+        }
+      });
+
+      window.addEventListener('beforeunload', persistInput);
+
+      restoreInput();
+      if (markdownInput.value.trim()) {
+        handleConvert();
+      }
+      updateCount();
+      setStatus('Ready to convert Markdown to Confluence XHTML.');
+      if (typeof window !== 'undefined') {
+        window.mdToConfluence = { convert, runConverterTests };
+      }
+    })();
+  </script>
+</body>
+</html>
