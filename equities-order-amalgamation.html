@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Equities Order Amalgamation Tool</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --accent: #2f6fed;
+      --accent-soft: rgba(47, 111, 237, 0.12);
+      --border: #d6dae5;
+      --text: #1f2430;
+      --muted: #667085;
+      --danger: #c0392b;
+      --warning: #d68910;
+      --radius: 12px;
+      --shadow: 0 12px 24px rgba(31, 36, 48, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--accent) 0%, #5278f0 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 2rem;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      letter-spacing: 0.5px;
+    }
+
+    main {
+      flex: 1;
+      padding: 1.5rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: 0 4px 16px rgba(15, 30, 64, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      background: #fff;
+    }
+
+    textarea:focus,
+    input:focus,
+    select:focus,
+    button:focus {
+      outline: 3px solid var(--accent-soft);
+      border-color: var(--accent);
+    }
+
+    .hint {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .add-form {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+      gap: 0.5rem;
+      align-items: end;
+    }
+
+    @media (max-width: 680px) {
+      .add-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .add-form button {
+        grid-column: 1 / -1;
+      }
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.8rem;
+      color: var(--muted);
+      gap: 0.2rem;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.55rem 0.65rem;
+      font-size: 0.95rem;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 12px rgba(47, 111, 237, 0.22);
+    }
+
+    button.secondary {
+      background: #eef1f9;
+      color: var(--accent);
+      border: 1px solid rgba(47, 111, 237, 0.2);
+      box-shadow: none;
+    }
+
+    button.danger {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    button.icon-only {
+      padding: 0.55rem;
+      width: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .tables {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .table-wrapper {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .table-header {
+      padding: 0.9rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      background: linear-gradient(120deg, rgba(47, 111, 237, 0.08), rgba(47, 111, 237, 0));
+    }
+
+    .summary {
+      font-size: 0.9rem;
+      color: var(--muted);
+      position: sticky;
+      top: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 640px;
+    }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    thead th {
+      background: #f0f3fa;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(240, 243, 250, 0.35);
+    }
+
+    tbody tr.invalid {
+      background: rgba(244, 86, 86, 0.08);
+    }
+
+    tbody tr.warning {
+      background: rgba(247, 203, 88, 0.12);
+    }
+
+    .status {
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .status.ok {
+      color: #1f8a51;
+    }
+
+    .status.warn {
+      color: var(--warning);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .delete-btn {
+      background: transparent;
+      color: var(--danger);
+      border: none;
+      font-size: 1.1rem;
+      padding: 0.25rem 0.45rem;
+      cursor: pointer;
+    }
+
+    .delete-btn:hover {
+      color: #fff;
+      background: var(--danger);
+      border-radius: 50%;
+    }
+
+    .scroll-container {
+      overflow: auto;
+      max-height: 420px;
+      position: relative;
+    }
+
+    .scroll-container::after {
+      content: "";
+      position: sticky;
+      right: 0;
+      top: 0;
+      width: 16px;
+      height: 100%;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.75));
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .add-form-message {
+      font-size: 0.85rem;
+      color: var(--danger);
+      min-height: 1em;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      z-index: 1000;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 14px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      padding: 1.5rem 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-height: 90vh;
+      overflow: auto;
+    }
+
+    .modal h2 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+
+    .modal ul {
+      margin: 0;
+      padding-left: 1.1rem;
+    }
+
+    .modal pre {
+      background: #f3f5fa;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      overflow: auto;
+    }
+
+    .modal button.close-modal {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 999px;
+    }
+
+    footer {
+      padding: 1rem 1.5rem 1.5rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .empty-state {
+      padding: 1.2rem;
+      text-align: center;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Equities Order Amalgamation Tool</h1>
+  </header>
+  <main>
+    <div class="layout">
+      <section class="panel" aria-label="Input panel">
+        <div>
+          <label for="orders-input">Orders input</label>
+          <textarea id="orders-input" placeholder="Client A, BUY, AAPL, 6, 100"></textarea>
+        </div>
+        <p class="hint">You can paste multiple lines into the textarea. Parsed continuously.</p>
+        <form class="add-form" id="add-form" autocomplete="off">
+          <label>Client
+            <input id="add-client" type="text" required>
+          </label>
+          <label>Side
+            <select id="add-side">
+              <option value="BUY">BUY</option>
+              <option value="SELL">SELL</option>
+            </select>
+          </label>
+          <label>Ticker
+            <input id="add-ticker" type="text" required>
+          </label>
+          <label>Price
+            <input id="add-price" type="text" inputmode="decimal" required>
+          </label>
+          <label>Quantity
+            <input id="add-quantity" type="number" inputmode="numeric" min="1" required>
+          </label>
+          <button type="submit">Add</button>
+        </form>
+        <div class="add-form-message" id="add-form-message"></div>
+        <div class="button-row">
+          <button type="button" id="preload-btn" class="secondary">Preload Test Data</button>
+          <button type="button" id="clear-btn" class="danger">Clear All</button>
+          <button type="button" id="export-csv-btn" class="secondary">Export Amalgamated (CSV)</button>
+          <button type="button" id="export-json-btn" class="secondary">Export Amalgamated (JSON)</button>
+          <button type="button" id="info-btn" class="icon-only secondary" aria-label="Info">ℹ️</button>
+        </div>
+      </section>
+      <section class="panel tables" aria-label="Output panel">
+        <div class="table-wrapper">
+          <div class="table-header">
+            <span>Raw Orders</span>
+            <span class="muted">Shows every parsed line and validation status</span>
+          </div>
+          <div class="scroll-container">
+            <table aria-describedby="raw-orders">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Side</th>
+                  <th>Ticker</th>
+                  <th>Price</th>
+                  <th>Qty</th>
+                  <th>Parsed OK?</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="raw-orders-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <div class="table-header">
+            <span>Amalgamated Orders</span>
+            <span class="summary" id="amalgamated-summary">Groups: 0 | Total Qty: 0</span>
+          </div>
+          <div class="scroll-container">
+            <table aria-describedby="amalgamated-orders">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Side</th>
+                  <th>Ticker</th>
+                  <th>Avg Price (VWAP)</th>
+                  <th>Total Qty</th>
+                </tr>
+              </thead>
+              <tbody id="amalgamated-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer>
+    v1.0
+  </footer>
+
+  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <button class="close-modal" id="modal-close" type="button">Close</button>
+      <h2 id="modal-title">How Amalgamation Works</h2>
+      <p>Orders are grouped by <strong>Client</strong> + <strong>Buy/Sell</strong> + <strong>Ticker</strong> (ticker uppercased).</p>
+      <p>The “Avg Price” is the Volume-Weighted Average Price (VWAP):</p>
+      <pre>VWAP = (Σ price × quantity) / (Σ quantity)</pre>
+      <p>Example:</p>
+      <pre>Pre-amalgamation:
+Client A, BUY, AAPL, $6, 100
+Client A, BUY, AAPL, $4, 100
+
+Amalgamated:
+Client A, BUY, AAPL, $5.00, 200</pre>
+      <ul>
+        <li>Price rounded to 2 decimals; quantities summed as integers.</li>
+        <li>Lines missing required fields are ignored from the aggregation until complete.</li>
+        <li>Accepted formats: comma- or tab-separated values (Client, Side, Ticker, Price, Quantity).</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const textarea = document.getElementById('orders-input');
+      const rawTableBody = document.getElementById('raw-orders-body');
+      const amalgamatedBody = document.getElementById('amalgamated-body');
+      const summaryEl = document.getElementById('amalgamated-summary');
+      const addForm = document.getElementById('add-form');
+      const addClient = document.getElementById('add-client');
+      const addSide = document.getElementById('add-side');
+      const addTicker = document.getElementById('add-ticker');
+      const addPrice = document.getElementById('add-price');
+      const addQuantity = document.getElementById('add-quantity');
+      const addFormMsg = document.getElementById('add-form-message');
+      const preloadBtn = document.getElementById('preload-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const exportCsvBtn = document.getElementById('export-csv-btn');
+      const exportJsonBtn = document.getElementById('export-json-btn');
+      const infoBtn = document.getElementById('info-btn');
+      const modalOverlay = document.getElementById('modal-overlay');
+      const modalClose = document.getElementById('modal-close');
+
+      const state = {
+        orders: [],
+        nextId: 1,
+        manualSequence: 1
+      };
+
+      function normalizeSide(value) {
+        if (!value && value !== 0) return null;
+        const normalized = String(value).trim().toUpperCase();
+        if (normalized === 'BUY' || normalized === 'B') return 'BUY';
+        if (normalized === 'SELL' || normalized === 'S') return 'SELL';
+        return null;
+      }
+
+      function parsePrice(value) {
+        if (value == null) return null;
+        const cleaned = String(value)
+          .replace(/[^0-9.,-]/g, '')
+          .replace(/,/g, '');
+        if (!cleaned) return null;
+        const price = parseFloat(cleaned);
+        if (!Number.isFinite(price) || price <= 0) return null;
+        return price;
+      }
+
+      function parseQuantity(value) {
+        if (value == null) return null;
+        const cleaned = String(value).replace(/[^0-9]/g, '');
+        if (!cleaned) return null;
+        const qty = parseInt(cleaned, 10);
+        if (!Number.isFinite(qty) || qty <= 0) return null;
+        return qty;
+      }
+
+      function toKey(client, side, ticker) {
+        return `${client}\u2758${side}\u2758${ticker}`;
+      }
+
+      function formatPrice(price) {
+        return price.toFixed(2);
+      }
+
+      function validateFields(raw) {
+        const clientRaw = raw.client != null ? String(raw.client) : '';
+        const sideRaw = raw.side != null ? String(raw.side) : '';
+        const tickerRaw = raw.ticker != null ? String(raw.ticker) : '';
+        const priceRaw = raw.price != null ? String(raw.price) : '';
+        const quantityRaw = raw.quantity != null ? String(raw.quantity) : '';
+
+      const result = {
+          clientDisplay: clientRaw.trim(),
+          sideDisplay: sideRaw.trim(),
+          tickerDisplay: tickerRaw.trim(),
+          priceDisplay: priceRaw.trim(),
+          quantityDisplay: quantityRaw.trim(),
+          valid: false,
+          message: '',
+          severity: 'error'
+        };
+
+        const required = [
+          { value: clientRaw.trim(), message: 'Missing client' },
+          { value: sideRaw.trim(), message: 'Missing side' },
+          { value: tickerRaw.trim(), message: 'Missing ticker' },
+          { value: priceRaw.trim(), message: 'Missing price' },
+          { value: quantityRaw.trim(), message: 'Missing quantity' }
+        ];
+
+        for (let i = 0; i < required.length; i++) {
+          if (!required[i].value) {
+            result.message = required[i].message;
+            result.severity = 'warn';
+            return result;
+          }
+        }
+
+        const client = clientRaw.trim();
+        const side = normalizeSide(sideRaw);
+        if (!side) {
+          result.message = 'Side must be BUY or SELL';
+          return result;
+        }
+        const ticker = tickerRaw.trim().toUpperCase();
+        const price = parsePrice(priceRaw);
+        if (price == null) {
+          result.message = 'Invalid price';
+          return result;
+        }
+        const quantity = parseQuantity(quantityRaw);
+        if (quantity == null) {
+          result.message = 'Invalid quantity';
+          return result;
+        }
+
+        return {
+          ...result,
+          valid: true,
+          message: 'OK',
+          severity: 'ok',
+          client,
+          side,
+          ticker,
+          price,
+          quantity,
+          key: toKey(client, side, ticker)
+        };
+      }
+
+      function parseLine(line) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return {
+            clientDisplay: '',
+            sideDisplay: '',
+            tickerDisplay: '',
+            priceDisplay: '',
+            quantityDisplay: '',
+            valid: false,
+            message: 'Empty line',
+            severity: 'warn'
+          };
+        }
+        const tokens = line.split(/[\t,]/).map(part => part.trim());
+        while (tokens.length < 5) {
+          tokens.push('');
+        }
+        const fields = {
+          client: tokens[0],
+          side: tokens[1],
+          ticker: tokens[2],
+          price: tokens[3],
+          quantity: tokens[4]
+        };
+        return validateFields(fields);
+      }
+
+      function recomputeAggregations() {
+        const groupsMap = new Map();
+        let totalQty = 0;
+        for (const order of state.orders) {
+          if (!order.valid) continue;
+          const existing = groupsMap.get(order.key);
+          if (existing) {
+            existing.totalQty += order.quantity;
+            existing.notional += order.price * order.quantity;
+          } else {
+            groupsMap.set(order.key, {
+              client: order.client,
+              side: order.side,
+              ticker: order.ticker,
+              totalQty: order.quantity,
+              notional: order.price * order.quantity
+            });
+          }
+          totalQty += order.quantity;
+        }
+
+        const groups = Array.from(groupsMap.values()).map(group => ({
+          client: group.client,
+          side: group.side,
+          ticker: group.ticker,
+          totalQty: group.totalQty,
+          avgPrice: group.notional / group.totalQty
+        }));
+
+        groups.sort((a, b) => {
+          if (a.client !== b.client) return a.client.localeCompare(b.client);
+          if (a.side !== b.side) return a.side.localeCompare(b.side);
+          return a.ticker.localeCompare(b.ticker);
+        });
+
+        return { groups, totalQty };
+      }
+
+      function renderRawTable() {
+        rawTableBody.innerHTML = '';
+        if (!state.orders.length) {
+          const row = document.createElement('tr');
+          const cell = document.createElement('td');
+          cell.colSpan = 7;
+          cell.className = 'empty-state';
+          cell.textContent = 'No orders parsed yet.';
+          row.appendChild(cell);
+          rawTableBody.appendChild(row);
+          return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        const sortedOrders = state.orders.slice().sort((a, b) => {
+          if (a.kind === b.kind) {
+            if (a.kind === 'textarea') {
+              return a.lineIndex - b.lineIndex;
+            }
+            return a.createdAt - b.createdAt;
+          }
+          return a.kind === 'textarea' ? -1 : 1;
+        });
+
+        for (const order of sortedOrders) {
+          const tr = document.createElement('tr');
+          if (!order.valid) {
+            tr.classList.add(order.severity === 'warn' ? 'warning' : 'invalid');
+          }
+
+          const clientTd = document.createElement('td');
+          clientTd.textContent = order.valid ? order.client : (order.clientDisplay || '—');
+          tr.appendChild(clientTd);
+
+          const sideTd = document.createElement('td');
+          sideTd.textContent = order.valid ? order.side : (order.sideDisplay || '—');
+          tr.appendChild(sideTd);
+
+          const tickerTd = document.createElement('td');
+          tickerTd.textContent = order.valid ? order.ticker : (order.tickerDisplay || '—');
+          tr.appendChild(tickerTd);
+
+          const priceTd = document.createElement('td');
+          if (order.valid) {
+            priceTd.textContent = formatPrice(order.price);
+          } else {
+            priceTd.textContent = order.priceDisplay || '—';
+          }
+          tr.appendChild(priceTd);
+
+          const qtyTd = document.createElement('td');
+          if (order.valid) {
+            qtyTd.textContent = order.quantity;
+          } else {
+            qtyTd.textContent = order.quantityDisplay || '—';
+          }
+          tr.appendChild(qtyTd);
+
+          const statusTd = document.createElement('td');
+          const statusSpan = document.createElement('span');
+          statusSpan.classList.add('status');
+          const severity = order.severity || (order.valid ? 'ok' : 'error');
+          if (order.valid) {
+            statusSpan.classList.add('ok');
+            statusSpan.textContent = '✓ OK';
+          } else {
+            statusSpan.classList.add(severity === 'warn' ? 'warn' : 'error');
+            statusSpan.textContent = severity === 'warn' ? `⚠️ ${order.message}` : order.message;
+          }
+          statusTd.appendChild(statusSpan);
+          tr.appendChild(statusTd);
+
+          const actionTd = document.createElement('td');
+          const deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
+          deleteBtn.className = 'delete-btn';
+          deleteBtn.setAttribute('aria-label', 'Remove row');
+          deleteBtn.textContent = '×';
+          deleteBtn.dataset.id = order.id;
+          actionTd.appendChild(deleteBtn);
+          tr.appendChild(actionTd);
+
+          fragment.appendChild(tr);
+        }
+
+        rawTableBody.appendChild(fragment);
+      }
+
+      function renderAmalgamatedTable() {
+        amalgamatedBody.innerHTML = '';
+        const { groups, totalQty } = recomputeAggregations();
+        summaryEl.textContent = `Groups: ${groups.length} | Total Qty: ${totalQty}`;
+
+        if (!groups.length) {
+          const row = document.createElement('tr');
+          const cell = document.createElement('td');
+          cell.colSpan = 5;
+          cell.className = 'empty-state';
+          cell.textContent = 'No valid amalgamated orders yet.';
+          row.appendChild(cell);
+          amalgamatedBody.appendChild(row);
+          return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        for (const group of groups) {
+          const tr = document.createElement('tr');
+          const clientTd = document.createElement('td');
+          clientTd.textContent = group.client;
+          tr.appendChild(clientTd);
+
+          const sideTd = document.createElement('td');
+          sideTd.textContent = group.side;
+          tr.appendChild(sideTd);
+
+          const tickerTd = document.createElement('td');
+          tickerTd.textContent = group.ticker;
+          tr.appendChild(tickerTd);
+
+          const priceTd = document.createElement('td');
+          priceTd.textContent = formatPrice(group.avgPrice);
+          tr.appendChild(priceTd);
+
+          const qtyTd = document.createElement('td');
+          qtyTd.textContent = group.totalQty;
+          tr.appendChild(qtyTd);
+
+          fragment.appendChild(tr);
+        }
+        amalgamatedBody.appendChild(fragment);
+      }
+
+      function renderAll() {
+        renderRawTable();
+        renderAmalgamatedTable();
+      }
+
+      function parseTextarea() {
+        const text = textarea.value.replace(/\r/g, '');
+        const lines = text.split('\n');
+        const newEntries = [];
+        lines.forEach((line, index) => {
+          if (!line.trim()) {
+            return;
+          }
+          const parsed = parseLine(line);
+          newEntries.push({
+            ...parsed,
+            id: `t${state.nextId++}`,
+            kind: 'textarea',
+            lineIndex: index,
+            rawLine: line
+          });
+        });
+        state.orders = state.orders.filter(order => order.kind !== 'textarea');
+        state.orders.push(...newEntries);
+        renderAll();
+      }
+
+      function removeOrder(id) {
+        const target = state.orders.find(order => order.id === id);
+        if (!target) return;
+        if (target.kind === 'textarea') {
+          const lines = textarea.value.replace(/\r/g, '').split('\n');
+          if (typeof target.lineIndex === 'number' && target.lineIndex >= 0) {
+            lines.splice(target.lineIndex, 1);
+            textarea.value = lines.join('\n');
+          }
+          parseTextarea();
+        } else {
+          state.orders = state.orders.filter(order => order.id !== id);
+          renderAll();
+        }
+      }
+
+      rawTableBody.addEventListener('click', event => {
+        const button = event.target.closest('button.delete-btn');
+        if (!button) return;
+        removeOrder(button.dataset.id);
+      });
+
+      textarea.addEventListener('input', () => {
+        parseTextarea();
+      });
+
+      addForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = {
+          client: addClient.value,
+          side: addSide.value,
+          ticker: addTicker.value,
+          price: addPrice.value,
+          quantity: addQuantity.value
+        };
+        const validation = validateFields(data);
+        if (!validation.valid) {
+          addFormMsg.textContent = validation.message;
+          return;
+        }
+        addFormMsg.textContent = '';
+        state.orders.push({
+          ...validation,
+          id: `m${state.nextId++}`,
+          kind: 'manual',
+          createdAt: state.manualSequence++
+        });
+        renderAll();
+        addForm.reset();
+        addSide.value = 'BUY';
+        addClient.focus();
+      });
+
+      function preloadTestData() {
+        const sample = [
+          'Client A, BUY, AAPL, $6, 100',
+          'Client A, BUY, AAPL, $4, 100',
+          'Client A, SELL, AAPL, 5.50, 50',
+          'Client B, buy, msft, 420.1, 10',
+          'Client B, BUY, MSFT, 419.9, 15',
+          'Client C\tSELL\tTSLA\t220.00\t5',
+          'Client C , SELL , tsla , $230 , 10',
+          'Client A, BUY, GOOG, 130.5, 200',
+          'Client A, BUY, goog, 129.5, 100',
+          'Bad Line Missing Fields'
+        ].join('\n');
+        textarea.value = sample;
+        parseTextarea();
+      }
+
+      function clearAll() {
+        textarea.value = '';
+        state.orders = [];
+        state.nextId = 1;
+        state.manualSequence = 1;
+        renderAll();
+      }
+
+      function escapeCsv(value) {
+        const text = String(value ?? '');
+        if (/[",\n]/.test(text)) {
+          return '"' + text.replace(/"/g, '""') + '"';
+        }
+        return text;
+      }
+
+      function exportCsv() {
+        const { groups } = recomputeAggregations();
+        if (!groups.length) {
+          alert('No amalgamated data to export.');
+          return;
+        }
+        const rows = ['Client,Side,Ticker,Avg Price (VWAP),Total Qty'];
+        groups.forEach(group => {
+          rows.push([
+            escapeCsv(group.client),
+            escapeCsv(group.side),
+            escapeCsv(group.ticker),
+            formatPrice(group.avgPrice),
+            group.totalQty
+          ].join(','));
+        });
+        downloadFile(rows.join('\n'), 'amalgamated-orders.csv', 'text/csv');
+      }
+
+      function exportJson() {
+        const { groups } = recomputeAggregations();
+        if (!groups.length) {
+          alert('No amalgamated data to export.');
+          return;
+        }
+        const payload = groups.map(group => ({
+          client: group.client,
+          side: group.side,
+          ticker: group.ticker,
+          avgPrice: parseFloat(formatPrice(group.avgPrice)),
+          totalQty: group.totalQty
+        }));
+        downloadFile(JSON.stringify(payload, null, 2), 'amalgamated-orders.json', 'application/json');
+      }
+
+      function downloadFile(content, filename, type) {
+        const blob = new Blob([content], { type: `${type};charset=utf-8;` });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      preloadBtn.addEventListener('click', preloadTestData);
+      clearBtn.addEventListener('click', clearAll);
+      exportCsvBtn.addEventListener('click', exportCsv);
+      exportJsonBtn.addEventListener('click', exportJson);
+
+      function openModal() {
+        modalOverlay.classList.add('open');
+      }
+
+      function closeModal() {
+        modalOverlay.classList.remove('open');
+      }
+
+      infoBtn.addEventListener('click', openModal);
+      modalClose.addEventListener('click', closeModal);
+      modalOverlay.addEventListener('click', event => {
+        if (event.target === modalOverlay) {
+          closeModal();
+        }
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && modalOverlay.classList.contains('open')) {
+          closeModal();
+        }
+      });
+
+      // Initial render
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
