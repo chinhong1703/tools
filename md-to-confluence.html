@@ -67,6 +67,16 @@
       align-items: stretch;
     }
 
+    .preview-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .preview-panel {
+      max-height: none;
+    }
+
     .panel {
       background: var(--panel-bg);
       border: 1px solid var(--border);
@@ -93,8 +103,7 @@
       font-size: 0.9rem;
     }
 
-    textarea,
-    .preview-surface {
+    textarea {
       flex: 1;
       width: 100%;
       border: none;
@@ -118,21 +127,32 @@
     }
 
     .preview-surface {
-      display: flex;
-      flex-direction: column;
+      width: 100%;
+      border: none;
+      padding: 1rem 1.25rem;
       background: rgba(15, 23, 42, 0.03);
       border-radius: 0 0 0.75rem 0.75rem;
-      overflow: auto;
       font-family: "Inter", "Segoe UI", sans-serif;
       font-size: 0.95rem;
       line-height: 1.65;
       color: inherit;
+      position: relative;
     }
 
     .preview-surface iframe {
       border: none;
       width: 100%;
-      min-height: 100%;
+      height: 0;
+      display: block;
+    }
+
+    .preview-placeholder {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .preview-placeholder[hidden] {
+      display: none;
     }
 
     .textarea-footer {
@@ -329,15 +349,18 @@
         <textarea id="xhtml-output" readonly aria-label="Confluence XHTML output" spellcheck="false"></textarea>
         <div class="textarea-footer">XML-safe output generated from Markdown.</div>
       </article>
-      <article class="panel" aria-labelledby="preview-label">
+    </section>
+    <section class="preview-wrapper" aria-label="Rendered preview">
+      <article class="panel preview-panel" aria-labelledby="preview-label">
         <header>
           <h2 id="preview-label">Rendered HTML Preview</h2>
-          <p>Live rendering of the converted XHTML for quick visual inspection.</p>
+          <p>Live rendering of the converted XHTML without its own scrollbars.</p>
         </header>
         <div class="preview-surface" tabindex="0" aria-live="polite" aria-label="Converted HTML preview">
-          <iframe id="xhtml-preview" title="Converted XHTML preview" sandbox="allow-popups"></iframe>
+          <div class="preview-placeholder" id="preview-placeholder">Converted HTML preview will appear here after conversion.</div>
+          <iframe id="xhtml-preview" title="Converted XHTML preview" sandbox="allow-popups allow-same-origin"></iframe>
         </div>
-        <div class="textarea-footer">Preview updates after each conversion.</div>
+        <div class="textarea-footer">Preview updates automatically as you type.</div>
       </article>
     </section>
     <section class="toolbar-row" aria-label="Conversion controls">
@@ -1010,12 +1033,30 @@
       const clearBtn = document.getElementById('clear-btn');
       const testsBtn = document.getElementById('tests-btn');
       const previewFrame = document.getElementById('xhtml-preview');
+      const previewPlaceholder = document.getElementById('preview-placeholder');
       const statusEl = document.getElementById('status');
       const toastEl = document.getElementById('toast');
       const testResultsEl = document.getElementById('test-results');
       const countEl = document.getElementById('markdown-count');
 
       const STORAGE_KEY = 'md-to-confluence:last-markdown';
+      const MIN_PREVIEW_HEIGHT = 120;
+
+      const scheduleTask =
+        typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+          ? window.requestAnimationFrame.bind(window)
+          : (cb) => setTimeout(cb, 0);
+
+      let conversionScheduled = false;
+
+      function scheduleConvert() {
+        if (conversionScheduled) return;
+        conversionScheduled = true;
+        scheduleTask(() => {
+          conversionScheduled = false;
+          handleConvert();
+        });
+      }
 
       function updateCount() {
         const count = markdownInput.value.length;
@@ -1060,10 +1101,33 @@
         const html = xhtml.trim();
         if (!html) {
           previewFrame.removeAttribute('srcdoc');
+          previewFrame.style.height = '0px';
+          if (previewPlaceholder) {
+            previewPlaceholder.hidden = false;
+          }
           return;
         }
+        if (previewPlaceholder) {
+          previewPlaceholder.hidden = true;
+        }
         const previewDocument = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><base target="_blank" /><style>body{font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:1rem;color:#0f172a;background:#f9fafb;line-height:1.6;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #d1d5db;padding:0.4rem 0.6rem;}code{font-family:'Fira Code','SFMono-Regular',Menlo,monospace;background:rgba(15,23,42,0.08);padding:0.1rem 0.25rem;border-radius:0.25rem;}pre{background:rgba(15,23,42,0.08);padding:0.75rem;border-radius:0.5rem;overflow:auto;}</style></head><body>${html}</body></html>`;
+        const adjustHeight = () => {
+          try {
+            const doc = previewFrame.contentDocument || (previewFrame.contentWindow && previewFrame.contentWindow.document);
+            if (!doc) return;
+            const rootHeight = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+            const bodyHeight = doc.body ? doc.body.scrollHeight : 0;
+            const height = Math.max(rootHeight, bodyHeight);
+            previewFrame.style.height = `${Math.max(height, MIN_PREVIEW_HEIGHT)}px`;
+          } catch (error) {
+            console.warn('Unable to resize preview iframe', error);
+            previewFrame.style.height = `${MIN_PREVIEW_HEIGHT}px`;
+          }
+        };
+        previewFrame.style.height = '0px';
         previewFrame.setAttribute('srcdoc', previewDocument);
+        previewFrame.addEventListener('load', adjustHeight, { once: true });
+        setTimeout(adjustHeight, 0);
       }
 
       function handleConvert() {
@@ -1169,18 +1233,14 @@
       markdownInput.addEventListener('input', () => {
         updateCount();
         persistInput();
+        scheduleConvert();
       });
 
       markdownInput.addEventListener('paste', () => {
-        const schedule =
-          typeof window.requestAnimationFrame === 'function'
-            ? window.requestAnimationFrame.bind(window)
-            : (cb) => setTimeout(cb, 0);
-        schedule(() => {
+        setTimeout(() => {
           updateCount();
           persistInput();
-          handleConvert();
-        });
+        }, 0);
       });
 
       markdownInput.addEventListener('keydown', (event) => {
