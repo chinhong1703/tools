@@ -1,0 +1,58 @@
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# ----------------------------------------------------------------------------
+
+set -euf
+
+MAVEN_HOME=""
+BASE_DIR="$(cd "$(dirname "$0")"; pwd -P)"
+WRAPPER_DIR="$BASE_DIR/.mvn/wrapper"
+WRAPPER_JAR="$WRAPPER_DIR/maven-wrapper.jar"
+WRAPPER_PROPERTIES="$WRAPPER_DIR/maven-wrapper.properties"
+
+if [ ! -f "$WRAPPER_PROPERTIES" ]; then
+  echo "Cannot locate $WRAPPER_PROPERTIES" >&2
+  exit 1
+fi
+
+if [ ! -f "$WRAPPER_JAR" ] || [ ! -s "$WRAPPER_JAR" ]; then
+  if command -v wget >/dev/null 2>&1; then
+    wget -q -O "$WRAPPER_JAR" "$(grep '^wrapperUrl' "$WRAPPER_PROPERTIES" | cut -d'=' -f2)"
+  elif command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$(grep '^wrapperUrl' "$WRAPPER_PROPERTIES" | cut -d'=' -f2)" -o "$WRAPPER_JAR"
+  else
+    echo "No downloader available to fetch Maven wrapper" >&2
+    WRAPPER_JAR=""
+  fi
+fi
+
+if [ "${WRAPPER_JAR}" = "" ] || [ ! -s "$WRAPPER_JAR" ]; then
+  if command -v mvn >/dev/null 2>&1; then
+    exec mvn "$@"
+  fi
+  echo "Maven wrapper JAR missing and mvn not available" >&2
+  exit 1
+fi
+
+JAVA_CMD="java"
+if [ "${JAVA_HOME-}" != "" ]; then
+  JAVA_CMD="$JAVA_HOME/bin/java"
+fi
+
+exec "$JAVA_CMD" -classpath "$WRAPPER_JAR" org.apache.maven.wrapper.MavenWrapperMain "$@"

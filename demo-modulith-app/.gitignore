@@ -1,0 +1,8 @@
+/target/
+/.mvn/wrapper/maven-wrapper.jar
+/.mvn/wrapper/maven-wrapper.properties
+/.mvn/wrapper/maven-wrapperDownloader.jar
+/.idea/
+*.iml
+*.log
+/.DS_Store
