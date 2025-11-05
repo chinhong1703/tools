@@ -1,0 +1,24 @@
+[project]
+name = "proxy"
+version = "0.1.0"
+description = "Minimal HTTP/S intercepting proxy with traffic inspector"
+authors = [{name = "Generated", email = "generated@example.com"}]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "sqlalchemy>=2.0",
+    "mitmproxy",
+    "httpx",
+    "pydantic",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
