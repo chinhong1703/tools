@@ -255,7 +255,7 @@
     </main>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js" integrity="sha512-22Wc/Ef0Zv90ORhJg9OnKv1sH0AwyA1OsiVlFlYnryAM8oHt8IuKV1ukOp9v2lLPMF1zt+DS0PQXD5q/8DPQ6g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js" integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
@@ -269,7 +269,12 @@
 
     let selectedFile = null;
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js';
+    if (!window.pdfjsLib) {
+      setStatus('PDF.js failed to load. Check your connection and reload.');
+      convertBtn.disabled = true;
+    } else {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js';
+    }
 
     const humanFileSize = (bytes) => {
       if (!bytes) return '0 B';
