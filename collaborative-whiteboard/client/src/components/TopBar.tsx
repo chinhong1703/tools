@@ -5,9 +5,11 @@ interface TopBarProps {
   roomId: string;
   onCopy: () => void;
   connected: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
-export default function TopBar({ roomId, onCopy, connected }: TopBarProps) {
+export default function TopBar({ roomId, onCopy, connected, onUndo, onRedo }: TopBarProps) {
   const navigate = useNavigate();
   const users = useWhiteboardStore((s) => s.users);
 
@@ -20,6 +22,8 @@ export default function TopBar({ roomId, onCopy, connected }: TopBarProps) {
           {connected ? 'Connected' : 'Offline'}
         </span>
         <button onClick={onCopy}>Copy share link</button>
+        <button onClick={onUndo}>Undo</button>
+        <button onClick={onRedo}>Redo</button>
       </div>
       <div className="right">
         <div className="avatars">

@@ -1,8 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Stage, Layer, Rect, Ellipse, Line as KonvaLine, Text as KonvaText, Arrow } from 'react-konva';
+import {
+  Stage,
+  Layer,
+  Rect,
+  Ellipse,
+  Line as KonvaLine,
+  Text as KonvaText,
+  Arrow,
+  Group,
+  Path,
+  Circle,
+} from 'react-konva';
 import Konva from 'konva';
 import { BoardElement, ViewportState } from '@collaborative-whiteboard/shared';
 import { Tool } from '../state/whiteboardStore';
+
+type RenderContext = {
+  onSelect: (id?: string) => void;
+  selectedId?: string;
+  tool: Tool;
+  strokeWidth: number;
+  fontSize: number;
+  onUpdate: (el: BoardElement) => void;
+};
 
 interface WhiteboardCanvasProps {
   elements: BoardElement[];
@@ -36,13 +56,26 @@ export default function WhiteboardCanvas({
   onViewportChange,
 }: WhiteboardCanvasProps) {
   const [draft, setDraft] = useState<BoardElement | null>(null);
-  const [stageSize, setStageSize] = useState({ width: window.innerWidth - 320, height: window.innerHeight - 80 });
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const stageRef = useRef<Konva.Stage>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isErasing, setIsErasing] = useState(false);
 
   useEffect(() => {
-    const onResize = () => setStageSize({ width: window.innerWidth - 320, height: window.innerHeight - 80 });
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const resize = () => {
+      const bounds = wrapperRef.current?.getBoundingClientRect();
+      if (bounds) {
+        setStageSize({ width: bounds.width, height: bounds.height });
+      }
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    if (wrapperRef.current) observer.observe(wrapperRef.current);
+    window.addEventListener('resize', resize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', resize);
+    };
   }, []);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -51,7 +84,7 @@ export default function WhiteboardCanvas({
     const stage = stageRef.current;
     const transformer = transformerRef.current;
     if (!stage || !transformer) return;
-    const selectedNode = stage.findOne(`#${selectedId}`) as Konva.Node | undefined;
+    const selectedNode = selectedId ? stage.findOne(`#${selectedId}`) : undefined;
     if (selectedNode) {
       transformer.nodes([selectedNode]);
     } else {
@@ -60,25 +93,67 @@ export default function WhiteboardCanvas({
     transformer.getLayer()?.batchDraw();
   }, [selectedId, draft, elements]);
 
-  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (tool === 'select' || tool === 'eraser') return;
+  useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    const pointer = stage.getPointerPosition();
+    const cursorByTool: Record<Tool, string> = {
+      select: 'default',
+      pen: 'crosshair',
+      rect: 'crosshair',
+      ellipse: 'crosshair',
+      line: 'crosshair',
+      arrow: 'crosshair',
+      connector: 'crosshair',
+      text: 'text',
+      eraser: 'cell',
+      pan: 'grab',
+      component: 'crosshair',
+      database: 'crosshair',
+      user: 'crosshair',
+      service: 'crosshair',
+      cloud: 'crosshair',
+    };
+    stage.container().style.cursor = cursorByTool[tool];
+  }, [tool]);
+
+  const eraseAtPointer = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pointer = stage.getRelativePointerPosition();
+    if (!pointer) return;
+    const node = stage.getIntersection(pointer);
+    if (node?.id()) {
+      onDelete(node.id());
+    }
+  };
+
+  const handleMouseDown = () => {
+    if (tool === 'select') return;
+    if (tool === 'eraser') {
+      setIsErasing(true);
+      eraseAtPointer();
+      return;
+    }
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pointer = getWorldPointer(stage, viewport);
     if (!pointer) return;
 
-    const { x, y } = toWorld(pointer, viewport);
+    const { x, y } = pointer;
     const base = createElement(tool, x, y, strokeColor, fillColor, strokeWidth, fontSize);
     setDraft(base);
   };
 
-  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseMove = () => {
+    if (isErasing) {
+      eraseAtPointer();
+    }
     if (!draft) return;
     const stage = stageRef.current;
     if (!stage) return;
-    const pointer = stage.getPointerPosition();
+    const pointer = getWorldPointer(stage, viewport);
     if (!pointer) return;
-    const { x, y } = toWorld(pointer, viewport);
+    const { x, y } = pointer;
 
     if (draft.type === 'pen') {
       const penDraft = { ...draft, points: [...draft.points, { x, y }] } as BoardElement;
@@ -92,13 +167,10 @@ export default function WhiteboardCanvas({
   };
 
   const handleMouseUp = () => {
+    setIsErasing(false);
     if (!draft) return;
     onCreate({ ...draft, width: draft.width, height: draft.height });
     setDraft(null);
-  };
-
-  const handleSelect = (id?: string) => {
-    onSelect(id);
   };
 
   const handleTransform = (node: Konva.Node) => {
@@ -157,13 +229,13 @@ export default function WhiteboardCanvas({
     }
     if (tool === 'select') {
       const id = e.target?.id();
-      handleSelect(id || undefined);
+      onSelect(id || undefined);
     } else if (tool === 'text') {
       const stage = stageRef.current;
       if (!stage) return;
-      const pointer = stage.getPointerPosition();
+      const pointer = getWorldPointer(stage, viewport);
       if (!pointer) return;
-      const { x, y } = toWorld(pointer, viewport);
+      const { x, y } = pointer;
       const text = window.prompt('Enter text', 'New text');
       if (text) {
         const element: BoardElement = {
@@ -188,7 +260,7 @@ export default function WhiteboardCanvas({
   };
 
   return (
-    <div className="canvas-wrapper">
+    <div className="canvas-wrapper" ref={wrapperRef}>
       <Stage
         width={stageSize.width}
         height={stageSize.height}
@@ -206,84 +278,16 @@ export default function WhiteboardCanvas({
         ref={stageRef}
       >
         <Layer>
-          {shapes.map((el) => {
-            const common = {
-              id: el.id,
-              x: el.x,
-              y: el.y,
-              stroke: el.strokeColor || '#111827',
-              fill: el.fillColor || 'transparent',
-              strokeWidth: el.strokeWidth ?? strokeWidth,
-              rotation: el.rotation || 0,
-              onClick: () => handleSelect(el.id),
-              onTap: () => handleSelect(el.id),
-            };
-            if (el.type === 'pen') {
-              const points = el.points.flatMap((p) => [p.x, p.y]);
-              return <KonvaLine key={el.id} {...common} points={points} tension={0.5} lineCap="round" />;
-            }
-            if (
-              el.type === 'rect' ||
-              el.type === 'component' ||
-              el.type === 'database' ||
-              el.type === 'service' ||
-              el.type === 'cloud' ||
-              el.type === 'user'
-            ) {
-              const label = labelForIcon(el.type);
-              return (
-                <>
-                  <Rect
-                    key={el.id}
-                    {...common}
-                    width={el.width}
-                    height={el.height}
-                    cornerRadius={6}
-                    fill={el.fillColor || '#fff'}
-                  />
-                  {label && (
-                    <KonvaText
-                      key={`${el.id}-text`}
-                      text={label}
-                      x={el.x + 8}
-                      y={el.y + 8}
-                      fontSize={14}
-                      fill={el.strokeColor || '#111827'}
-                    />
-                  )}
-                </>
-              );
-            }
-            if (el.type === 'ellipse') {
-              return (
-                <Ellipse
-                  key={el.id}
-                  {...common}
-                  radiusX={Math.abs(el.width)}
-                  radiusY={Math.abs(el.height)}
-                />
-              );
-            }
-            if (el.type === 'line' || el.type === 'connector') {
-              return <KonvaLine key={el.id} {...common} points={[el.x, el.y, el.x + el.width, el.y + el.height]} />;
-            }
-            if (el.type === 'arrow') {
-              return <Arrow key={el.id} {...common} points={[el.x, el.y, el.x + el.width, el.y + el.height]} pointerLength={12} pointerWidth={12} />;
-            }
-            if (el.type === 'text') {
-              const textEl = el as any;
-              return (
-                <KonvaText
-                  key={el.id}
-                  {...common}
-                  text={textEl.text}
-                  fontSize={textEl.fontSize || fontSize}
-                  width={textEl.width}
-                />
-              );
-            }
-            return null;
-          })}
+          {shapes.map((el) =>
+            renderElement(el, {
+              onSelect,
+              selectedId,
+              tool,
+              strokeWidth,
+              fontSize,
+              onUpdate,
+            })
+          )}
           <Konva.Transformer
             ref={transformerRef}
             onTransformEnd={(e) => handleTransform(e.target)}
@@ -304,6 +308,95 @@ export default function WhiteboardCanvas({
       </div>
     </div>
   );
+}
+
+function renderElement(el: BoardElement, context: RenderContext) {
+  const { onSelect, selectedId, tool, strokeWidth, fontSize, onUpdate } = context;
+  const isSelected = selectedId === el.id;
+  const draggable = tool === 'select' && isSelected;
+  const common = {
+    id: el.id,
+    stroke: el.strokeColor || '#111827',
+    fill: el.fillColor || 'transparent',
+    strokeWidth: el.strokeWidth ?? strokeWidth,
+    rotation: el.rotation || 0,
+    draggable,
+    onClick: () => onSelect(el.id),
+    onTap: () => onSelect(el.id),
+    onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
+      const node = e.target;
+      const updated = { ...el, x: node.x(), y: node.y() } as BoardElement;
+      onUpdate(updated);
+    },
+  };
+
+  if (el.type === 'pen') {
+    const points = el.points.flatMap((p) => [p.x, p.y]);
+    return <KonvaLine key={el.id} {...common} points={points} tension={0.5} lineCap="round" />;
+  }
+
+  if (el.type === 'rect') {
+    const box = normalizeBox(el);
+    return <Rect key={el.id} {...common} {...box} cornerRadius={6} />;
+  }
+
+  if (el.type === 'ellipse') {
+    const box = normalizeBox(el);
+    return (
+      <Ellipse
+        key={el.id}
+        {...common}
+        x={box.x + box.width / 2}
+        y={box.y + box.height / 2}
+        radiusX={box.width / 2}
+        radiusY={box.height / 2}
+      />
+    );
+  }
+
+  if (el.type === 'line' || el.type === 'connector') {
+    const box = normalizeBox(el);
+    return <KonvaLine key={el.id} {...common} points={[box.x, box.y, box.x + box.width, box.y + box.height]} />;
+  }
+
+  if (el.type === 'arrow') {
+    const box = normalizeBox(el);
+    return (
+      <Arrow
+        key={el.id}
+        {...common}
+        points={[box.x, box.y, box.x + box.width, box.y + box.height]}
+        pointerLength={12}
+        pointerWidth={12}
+      />
+    );
+  }
+
+  if (el.type === 'text') {
+    const textEl = el as any;
+    return (
+      <KonvaText
+        key={el.id}
+        {...common}
+        x={el.x}
+        y={el.y}
+        text={textEl.text}
+        fontSize={textEl.fontSize || fontSize}
+        width={textEl.width}
+      />
+    );
+  }
+
+  if (el.type === 'component' || el.type === 'database' || el.type === 'service' || el.type === 'cloud' || el.type === 'user') {
+    const icon = renderIcon(el);
+    return (
+      <Group key={el.id} {...common}>
+        {icon}
+      </Group>
+    );
+  }
+
+  return null;
 }
 
 function createElement(
@@ -352,19 +445,83 @@ function toWorld(point: { x: number; y: number }, viewport: ViewportState) {
   };
 }
 
-function labelForIcon(type: BoardElement['type']) {
-  switch (type) {
-    case 'database':
-      return 'Database';
-    case 'service':
-      return 'Service';
-    case 'cloud':
-      return 'Cloud';
-    case 'user':
-      return 'User';
-    case 'component':
-      return 'Component';
-    default:
-      return '';
+function normalizeBox(el: BoardElement) {
+  const width = Math.abs(el.width || 0);
+  const height = Math.abs(el.height || 0);
+  const x = el.width >= 0 ? el.x : el.x + el.width;
+  const y = el.height >= 0 ? el.y : el.y + el.height;
+  return { x, y, width, height };
+}
+
+function renderIcon(el: BoardElement) {
+  const box = normalizeBox(el);
+  const color = el.strokeColor || '#111827';
+  const fill = el.fillColor || '#fff';
+
+  if (el.type === 'database') {
+    return (
+      <Group>
+        <Rect x={box.x} y={box.y + box.height * 0.15} width={box.width} height={box.height * 0.7} stroke={color} fill={fill} cornerRadius={8} />
+        <Ellipse x={box.x + box.width / 2} y={box.y + box.height * 0.15} radiusX={box.width / 2} radiusY={Math.max(8, box.height * 0.15)} stroke={color} fill={fill} />
+        <Ellipse
+          x={box.x + box.width / 2}
+          y={box.y + box.height * 0.85}
+          radiusX={box.width / 2}
+          radiusY={Math.max(6, box.height * 0.12)}
+          stroke={color}
+          fill={fill}
+        />
+      </Group>
+    );
   }
+
+  if (el.type === 'user') {
+    const radius = Math.min(box.width, box.height) / 2;
+    return (
+      <Group>
+        <Circle x={box.x + box.width / 2} y={box.y + radius * 0.9} radius={radius * 0.4} stroke={color} fill={fill} />
+        <Path
+          x={box.x + box.width / 2 - radius * 0.8}
+          y={box.y + radius}
+          data={`M${radius * 0.8},${radius * 0.6} q${radius * 0.8},${radius * 0.5} ${radius * 0.8},${radius * 1.4} h-${radius * 1.6} q0-${radius * 0.9} ${radius * 0.8}-${radius * 1.4} z`}
+          stroke={color}
+          fill={fill}
+        />
+      </Group>
+    );
+  }
+
+  if (el.type === 'service' || el.type === 'component') {
+    return (
+      <Group>
+        <Rect x={box.x} y={box.y} width={box.width} height={box.height} stroke={color} fill={fill} cornerRadius={10} />
+        <Rect x={box.x + 8} y={box.y + 10} width={box.width - 16} height={box.height - 20} stroke={color} fill={fill} cornerRadius={6} />
+        <KonvaLine points={[box.x + 12, box.y + box.height / 2, box.x + box.width - 12, box.y + box.height / 2]} stroke={color} />
+      </Group>
+    );
+  }
+
+  if (el.type === 'cloud') {
+    return (
+      <Group>
+        <Path
+          x={box.x}
+          y={box.y + box.height * 0.3}
+          data={`M0 ${box.height * 0.4} q${box.width * 0.2}-${box.height * 0.3} ${box.width * 0.4} 0 q${box.width * 0.05}-${box.height * 0.3} ${box.width * 0.25}-${box.height * 0.2} q${box.width * 0.2}-${box.height * 0.05} ${box.width * 0.2} ${box.height * 0.2} q${box.width * 0.2} 0 ${box.width * 0.2} ${box.height * 0.3} q-${box.width * 0.1} ${box.height * 0.2}-${box.width * 0.3} ${box.height * 0.15} h-${box.width * 0.55} q-${box.width * 0.25} 0-${box.width * 0.2}-${box.height * 0.45} z`}
+          stroke={color}
+          fill={fill}
+        />
+      </Group>
+    );
+  }
+
+  return <Rect x={box.x} y={box.y} width={box.width} height={box.height} stroke={color} fill={fill} cornerRadius={6} />;
+}
+
+function getWorldPointer(stage: Konva.Stage, viewport: ViewportState) {
+  const relative = stage.getRelativePointerPosition();
+  if (relative) return relative;
+  const pointer = stage.getPointerPosition();
+  if (!pointer) return null;
+  return toWorld(pointer, viewport);
 }

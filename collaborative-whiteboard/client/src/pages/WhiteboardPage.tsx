@@ -54,7 +54,7 @@ export default function WhiteboardPage() {
 
   return (
     <div className="whiteboard-page">
-      <TopBar roomId={roomId} onCopy={handleCopy} connected={connected} />
+      <TopBar roomId={roomId} onCopy={handleCopy} connected={connected} onUndo={handleUndo} onRedo={handleRedo} />
       <div className="workspace">
         <Toolbar />
         <WhiteboardCanvas
