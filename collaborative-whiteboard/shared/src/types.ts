@@ -85,6 +85,7 @@ export interface HistoryAction {
   type: 'create' | 'update' | 'delete' | 'clear';
   element?: BoardElement;
   previous?: BoardElement;
+  snapshot?: BoardElement[];
 }
 
 export interface ViewportState {

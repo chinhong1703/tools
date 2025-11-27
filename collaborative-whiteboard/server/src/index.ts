@@ -2,20 +2,8 @@ import cors from 'cors';
 import express from 'express';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import {
-  BoardElement,
-  HistoryAction,
-  RoomState,
-  UserInfo,
-  roomIdIsValid,
-} from '@collaborative-whiteboard/shared';
-
-type RoomStore = {
-  elements: Map<string, BoardElement>;
-  history: HistoryAction[];
-  future: HistoryAction[];
-  users: Map<string, UserInfo>;
-};
+import { BoardElement, UserInfo, roomIdIsValid } from '@collaborative-whiteboard/shared';
+import { applyRedo, applyUndo, buildRoomState, ensureRoom, RoomStore } from './roomStore';
 
 const rooms: Map<string, RoomStore> = new Map();
 
@@ -47,7 +35,7 @@ io.on('connection', (socket: Socket) => {
     room.users.set(user.id, user);
     socket.join(roomId);
 
-    socket.emit('initial_state', buildRoomState(roomId));
+    socket.emit('initial_state', buildRoomState(roomId, room));
     socket.to(roomId).emit('user_joined', { user, roomId });
 
     socket.on('element_created', ({ element }: { element: BoardElement }) => {
@@ -80,24 +68,23 @@ io.on('connection', (socket: Socket) => {
 
     socket.on('board_cleared', () => {
       const snapshot = Array.from(room.elements.values());
-      room.history.push({ type: 'clear', previous: undefined, element: undefined });
+      const clearAction = { type: 'clear' as const, snapshot };
+      room.history.push(clearAction);
       room.elements.clear();
       room.future = [];
       io.to(roomId).emit('board_cleared', { roomId });
-      room.history.push({ type: 'delete', previous: undefined, element: undefined });
-      snapshot.forEach((element) => room.history.push({ type: 'delete', element }));
     });
 
     socket.on('undo', () => {
       const action = room.history.pop();
       if (!action) return;
-      applyUndo(room, roomId, action);
+      applyUndo(room, roomId, action, (event, payload) => io.to(roomId).emit(event, payload));
     });
 
     socket.on('redo', () => {
       const action = room.future.pop();
       if (!action) return;
-      applyRedo(room, roomId, action);
+      applyRedo(room, roomId, action, (event, payload) => io.to(roomId).emit(event, payload));
     });
 
     socket.on('disconnect', () => {
@@ -106,92 +93,6 @@ io.on('connection', (socket: Socket) => {
     });
   });
 });
-
-function ensureRoom(roomId: string): RoomStore {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, {
-      elements: new Map(),
-      history: [],
-      future: [],
-      users: new Map(),
-    });
-  }
-  return rooms.get(roomId)!;
-}
-
-function buildRoomState(roomId: string): RoomState {
-  const room = ensureRoom(roomId);
-  return {
-    roomId,
-    elements: Array.from(room.elements.values()),
-    users: Array.from(room.users.values()),
-  };
-}
-
-function applyUndo(room: RoomStore, roomId: string, action: HistoryAction) {
-  switch (action.type) {
-    case 'create': {
-      if (action.element) {
-        room.elements.delete(action.element.id);
-        room.future.push(action);
-        io.to(roomId).emit('element_deleted', { roomId, elementId: action.element.id });
-      }
-      break;
-    }
-    case 'update': {
-      if (action.previous) {
-        room.elements.set(action.previous.id, action.previous);
-        room.future.push(action);
-        io.to(roomId).emit('element_updated', { roomId, element: action.previous });
-      }
-      break;
-    }
-    case 'delete': {
-      if (action.element) {
-        room.elements.set(action.element.id, action.element);
-        room.future.push(action);
-        io.to(roomId).emit('element_created', { roomId, element: action.element });
-      }
-      break;
-    }
-    case 'clear': {
-      // nothing to restore without snapshot here
-      break;
-    }
-  }
-}
-
-function applyRedo(room: RoomStore, roomId: string, action: HistoryAction) {
-  switch (action.type) {
-    case 'create': {
-      if (action.element) {
-        room.elements.set(action.element.id, action.element);
-        io.to(roomId).emit('element_created', { roomId, element: action.element });
-      }
-      break;
-    }
-    case 'update': {
-      if (action.element) {
-        room.elements.set(action.element.id, action.element);
-        io.to(roomId).emit('element_updated', { roomId, element: action.element });
-      }
-      break;
-    }
-    case 'delete': {
-      if (action.element) {
-        room.elements.delete(action.element.id);
-        io.to(roomId).emit('element_deleted', { roomId, elementId: action.element.id });
-      }
-      break;
-    }
-    case 'clear': {
-      room.elements.clear();
-      io.to(roomId).emit('board_cleared', { roomId });
-      break;
-    }
-  }
-  room.history.push(action);
-}
 
 httpServer.listen(PORT, () => {
   console.log(`server listening on ${PORT}`);

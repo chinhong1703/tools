@@ -37,7 +37,7 @@ export interface WhiteboardState {
   strokeWidth: number;
   fontSize: number;
   viewport: ViewportState;
-  setRoom: (roomId: string) => void;
+  setRoom: (roomId: string | null) => void;
   setElements: (elements: BoardElement[]) => void;
   addElement: (element: BoardElement) => void;
   updateElement: (element: BoardElement) => void;
