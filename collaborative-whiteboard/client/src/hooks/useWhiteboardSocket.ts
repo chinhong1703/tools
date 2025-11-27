@@ -13,7 +13,6 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
 export function useWhiteboardSocket(roomId: string) {
   const [connected, setConnected] = useState(false);
   const user = useMemo(() => useWhiteboardStore.getState().generateUser(), []);
-  const store = useWhiteboardStore();
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -31,26 +30,38 @@ export function useWhiteboardSocket(roomId: string) {
     });
 
     socket.on('user_joined', ({ user: joined }: { user: UserInfo }) => {
-      store.upsertUser(joined);
+      useWhiteboardStore.getState().upsertUser(joined);
     });
 
     socket.on('user_left', ({ userId }: { userId: string }) => {
-      store.removeUser(userId);
+      useWhiteboardStore.getState().removeUser(userId);
     });
 
     socket.on('element_created', ({ element }: { element: BoardElement }) => {
-      store.addElement(element);
+      useWhiteboardStore.getState().addElement(element);
     });
 
-    socket.on('element_updated', ({ element }: { element: BoardElement }) => {
-      store.updateElement(element);
-    });
+        socket.on(
+
+          'element_updated',
+
+          ({ element }: { element: BoardElement }) => {
+
+            useWhiteboardStore.getState().updateElement(element);
+
+          }
+
+        );
 
     socket.on('element_deleted', ({ elementId }: { elementId: string }) => {
-      store.deleteElement(elementId);
+      useWhiteboardStore.getState().deleteElement(elementId);
     });
 
-    socket.on('board_cleared', () => store.clearBoard());
+        socket.on('board_cleared', () =>
+
+          useWhiteboardStore.getState().clearBoard()
+
+        );
 
     socket.on('disconnect', () => setConnected(false));
 
@@ -58,7 +69,7 @@ export function useWhiteboardSocket(roomId: string) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [roomId, store, user]);
+  }, [roomId, user]);
 
   const emit = (event: string, payload: unknown) => {
     socketRef.current?.emit(event, payload);

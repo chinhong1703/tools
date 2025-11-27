@@ -31,11 +31,11 @@ io.on('connection', (socket: Socket) => {
       return;
     }
 
-    const room = ensureRoom(roomId);
+    const room = ensureRoom(rooms, roomId);
     room.users.set(user.id, user);
     socket.join(roomId);
 
-    socket.emit('initial_state', buildRoomState(roomId, room));
+    socket.emit('initial_state', { state: buildRoomState(roomId, room) });
     socket.to(roomId).emit('user_joined', { user, roomId });
 
     socket.on('element_created', ({ element }: { element: BoardElement }) => {
