@@ -10,6 +10,7 @@ import {
   Group,
   Path,
   Circle,
+  Transformer,
 } from 'react-konva';
 import Konva from 'konva';
 import { BoardElement, ViewportState } from '@collaborative-whiteboard/shared';
@@ -288,7 +289,7 @@ export default function WhiteboardCanvas({
               onUpdate,
             })
           )}
-          <Konva.Transformer
+          <Transformer
             ref={transformerRef}
             onTransformEnd={(e) => handleTransform(e.target)}
             rotateEnabled

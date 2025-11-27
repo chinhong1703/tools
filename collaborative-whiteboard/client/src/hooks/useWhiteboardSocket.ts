@@ -26,8 +26,8 @@ export function useWhiteboardSocket(roomId: string) {
       socket.emit('join_room', { roomId, user });
     });
 
-    socket.on('initial_state', (payload: { state: RoomState }) => {
-      syncRoomState(payload.state);
+    socket.on('initial_state', (state: RoomState) => {
+      syncRoomState(state);
     });
 
     socket.on('user_joined', ({ user: joined }: { user: UserInfo }) => {

@@ -96,10 +96,15 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   updateStyle: (style) => set(style),
   setViewport: (viewport) => set({ viewport }),
   generateUser: () => {
-    const colors = DEFAULT_COLORS;
-    const name = `User ${Math.floor(Math.random() * 90) + 10}`;
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    return { id: nanoid(), name, color };
+    const colors = DEFAULT_COLORS || ['#2563eb', '#ea580c', '#16a34a', '#db2777', '#0891b2', '#7c3aed'];
+    try {
+      const name = `User ${Math.floor(Math.random() * 90) + 10}`;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      return { id: nanoid(), name, color };
+    } catch (e) {
+      console.error('Error generating user:', e);
+      return { id: 'fallback-' + Date.now(), name: 'Guest', color: colors[0] };
+    }
   },
 }));
 
