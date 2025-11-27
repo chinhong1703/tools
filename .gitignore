@@ -140,6 +140,6 @@ vite.config.ts.timestamp-*
 
 # gemini-cli settings
 .gemini/
-
+.gemini-clipboard/
 # GitHub App credentials
 gha-creds-*.json

@@ -1,0 +1,19 @@
+{
+  "name": "collaborative-whiteboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "workspaces": ["server", "client", "shared"],
+  "scripts": {
+    "dev": "concurrently \"npm --workspace server run dev\" \"npm --workspace client run dev\"",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "build": "npm --workspace shared run build && npm --workspace server run build && npm --workspace client run build",
+    "lint": "npm --workspace server run lint && npm --workspace client run lint",
+    "test": "npm --workspace shared run test && npm --workspace server run test && npm --workspace client run test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
