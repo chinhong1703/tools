@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Intercepting Proxy Inspector</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f7f7f7;
+      }
+      header {
+        background: #2c3e50;
+        color: #fff;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        height: calc(100vh - 72px);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        padding: 0.5rem;
+        border-bottom: 1px solid #ddd;
+        text-align: left;
+        font-size: 0.9rem;
+      }
+      tr:hover {
+        background: #eef6ff;
+        cursor: pointer;
+      }
+      #details {
+        background: #fff;
+        overflow: auto;
+        padding: 1rem;
+        border-left: 1px solid #ddd;
+      }
+      pre {
+        background: #f0f0f0;
+        padding: 0.75rem;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      button {
+        background: #1abc9c;
+        border: none;
+        color: #fff;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #7f8c8d;
+      }
+      button:disabled {
+        background: #95a5a6;
+        cursor: not-allowed;
+      }
+      #list-container {
+        overflow: auto;
+      }
+      .badge {
+        background: #34495e;
+        color: #fff;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+        #details {
+          border-left: none;
+          border-top: 1px solid #ddd;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 style="margin: 0; font-size: 1.25rem;">Intercepting Proxy Inspector</h1>
+      <button id="refresh">Refresh</button>
+      <button id="clear" class="secondary">Clear</button>
+      <span id="status" aria-live="polite"></span>
+    </header>
+    <main>
+      <section id="list-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Client</th>
+              <th>Method</th>
+              <th>URL</th>
+              <th>Status</th>
+              <th>Size</th>
+            </tr>
+          </thead>
+          <tbody id="request-rows"></tbody>
+        </table>
+      </section>
+      <section id="details">
+        <h2>Request Details</h2>
+        <div id="detail-content">Select a request to inspect.</div>
+      </section>
+    </main>
+    <script>
+      const rowsEl = document.getElementById('request-rows');
+      const detailEl = document.getElementById('detail-content');
+      const statusEl = document.getElementById('status');
+      const refreshBtn = document.getElementById('refresh');
+      const clearBtn = document.getElementById('clear');
+      let currentId = null;
+
+      async function loadRequests() {
+        statusEl.textContent = 'Loading…';
+        try {
+          const response = await fetch('/api/requests');
+          const data = await response.json();
+          rowsEl.innerHTML = '';
+          data.items.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${new Date(item.timestamp).toLocaleTimeString()}</td>
+              <td>${item.client_ip}</td>
+              <td><span class="badge">${item.method}</span></td>
+              <td title="${item.url}">${item.url}</td>
+              <td>${item.response_status ?? '-'}</td>
+              <td>${item.size}</td>
+            `;
+            row.addEventListener('click', () => loadDetails(item.id));
+            rowsEl.appendChild(row);
+          });
+          statusEl.textContent = `${data.total} flows`;
+        } catch (error) {
+          console.error(error);
+          statusEl.textContent = 'Failed to load requests';
+        }
+      }
+
+      function renderBody(body) {
+        if (!body || body.content === null) {
+          return '<em>No body</em>';
+        }
+        if (!body.is_text) {
+          return `<em>Binary data (${body.size} bytes, base64 preview)</em><pre>${body.content}</pre>`;
+        }
+        return `<pre>${body.content}</pre>`;
+      }
+
+      function renderHeaders(headers) {
+        if (!headers || headers.length === 0) {
+          return '<em>No headers</em>';
+        }
+        return `<pre>${headers.map(h => `${h.name}: ${h.value}`).join('\n')}</pre>`;
+      }
+
+      async function loadDetails(id) {
+        currentId = id;
+        detailEl.innerHTML = '<p>Loading…</p>';
+        try {
+          const response = await fetch(`/api/requests/${id}`);
+          if (!response.ok) {
+            throw new Error('Failed to load details');
+          }
+          const data = await response.json();
+          detailEl.innerHTML = `
+            <h3>${data.method} ${data.url}</h3>
+            <p><strong>Timestamp:</strong> ${data.timestamp}</p>
+            <p><strong>Client:</strong> ${data.client_ip}</p>
+            <h4>Request Headers</h4>
+            ${renderHeaders(data.request.headers)}
+            <h4>Request Body</h4>
+            ${renderBody(data.request.body)}
+            <h4>Response (${data.response.status ?? 'n/a'})</h4>
+            ${renderHeaders(data.response.headers)}
+            <h4>Response Body</h4>
+            ${renderBody(data.response.body)}
+            <button id="replay">Replay Request</button>
+            <div id="replay-result"></div>
+          `;
+          document.getElementById('replay').addEventListener('click', () => replayRequest(id));
+        } catch (error) {
+          console.error(error);
+          detailEl.innerHTML = '<p>Failed to load details.</p>';
+        }
+      }
+
+      async function replayRequest(id) {
+        const resultEl = document.getElementById('replay-result');
+        resultEl.textContent = 'Replaying…';
+        try {
+          const response = await fetch(`/api/requests/${id}/replay`, { method: 'POST' });
+          if (!response.ok) {
+            throw new Error('Replay failed');
+          }
+          const data = await response.json();
+          resultEl.innerHTML = `
+            <p><strong>Status:</strong> ${data.status}</p>
+            <h4>Live Response Headers</h4>
+            ${renderHeaders(data.headers)}
+            <h4>Live Response Body</h4>
+            ${renderBody(data.body)}
+          `;
+        } catch (error) {
+          console.error(error);
+          resultEl.textContent = error.message;
+        }
+      }
+
+      refreshBtn.addEventListener('click', loadRequests);
+      clearBtn.addEventListener('click', async () => {
+        if (!confirm('Clear all captured flows?')) {
+          return;
+        }
+        try {
+          await fetch('/api/requests/clear', { method: 'POST' });
+          detailEl.innerHTML = 'Select a request to inspect.';
+          loadRequests();
+        } catch (error) {
+          console.error(error);
+        }
+      });
+
+      loadRequests();
+      setInterval(() => {
+        if (!document.hidden) {
+          loadRequests();
+        }
+      }, 5000);
+    </script>
+  </body>
+</html>
