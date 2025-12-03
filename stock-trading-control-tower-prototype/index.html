@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trade Settlement Control Centre</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #131a22;
+    --text: #e6edf3;
+    --muted: #9fb3c8;
+    --accent: #00c2ff;
+    --green: #29c46d;
+    --amber: #f2a900;
+    --red: #ff5f5f;
+    --border: #1f2733;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #0b0f15;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.4px;
+  }
+  .env-switch {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .pill {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    background: #0f1621;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+  }
+  .pill.active {
+    border-color: var(--accent);
+    color: var(--text);
+    box-shadow: 0 0 12px rgba(0, 194, 255, 0.5);
+  }
+  .timestamp { color: var(--muted); font-size: 12px; }
+  main {
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 45% 55%;
+    grid-gap: 16px;
+  }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .panel-title {
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  /* Process flow */
+  .flow { display: flex; flex-direction: column; gap: 20px; }
+  .flow-diagram {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    position: relative;
+  }
+  .stage {
+    position: relative;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: linear-gradient(145deg, #152233, #0f1825);
+    transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s;
+  }
+  .stage:hover { transform: translateY(-2px); }
+  .stage .name { font-weight: 600; margin-bottom: 6px; }
+  .stage .count { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; }
+  .stage .status { font-size: 12px; color: var(--muted); margin-top: 6px; display: block; }
+  .stage.green { border-color: rgba(41, 196, 109, 0.7); box-shadow: 0 0 10px rgba(41, 196, 109, 0.4); }
+  .stage.amber { border-color: rgba(242, 169, 0, 0.7); box-shadow: 0 0 10px rgba(242, 169, 0, 0.35); }
+  .stage.red { border-color: rgba(255, 95, 95, 0.8); box-shadow: 0 0 12px rgba(255, 95, 95, 0.5); }
+  .stage.selected { outline: 2px solid var(--accent); box-shadow: 0 0 18px rgba(0, 194, 255, 0.4); }
+  .flow-arrows {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 0 0;
+  }
+  .arrow { flex: 1; height: 2px; background: #263447; position: relative; }
+  .arrow:after { content: ""; position: absolute; right: -6px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid #3b9ad6; }
+  /* KPI tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .tile {
+    padding: 14px;
+    border-radius: 10px;
+    background: radial-gradient(circle at 20% 20%, rgba(0,194,255,0.08), rgba(0,0,0,0)), #101826;
+    border: 1px solid var(--border);
+    transition: transform 0.15s ease, border-color 0.2s ease;
+  }
+  .tile:hover { transform: translateY(-2px); border-color: rgba(0, 194, 255, 0.5); }
+  .tile .label { color: var(--muted); font-size: 12px; letter-spacing: 0.5px; }
+  .tile .value { font-size: 26px; font-weight: 700; margin: 6px 0; }
+  .tile .sub { color: var(--muted); font-size: 12px; }
+  /* Filters */
+  .filters { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  select, input[type="text"] {
+    background: #0f1621;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    min-width: 140px;
+  }
+  input[type="text"] { flex: 1; min-width: 160px; }
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  thead { color: var(--muted); font-size: 12px; letter-spacing: 0.4px; text-transform: uppercase; }
+  th, td { padding: 10px 8px; border-bottom: 1px solid #1c2734; text-align: left; }
+  tbody tr { cursor: pointer; transition: background 0.15s ease; }
+  tbody tr:hover { background: rgba(0, 194, 255, 0.05); }
+  tbody tr.selected { outline: 1px solid var(--accent); background: rgba(0, 194, 255, 0.08); }
+  .status-pill { padding: 4px 8px; border-radius: 6px; font-size: 12px; color: #0b0f15; font-weight: 700; }
+  .status-NEW { background: #8ad1ff; }
+  .status-IN-PROGRESS { background: #38bdf8; }
+  .status-SETTLED { background: #4ade80; }
+  .status-FAILED { background: #f87171; }
+  .status-CANCELLED { background: #e5e7eb; }
+  /* Selected details */
+  .details { margin-top: 12px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; background: #0e1723; }
+  .details h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: 0.5px; }
+  .timeline { list-style: none; padding: 0; margin: 10px 0 0; }
+  .timeline li { margin-bottom: 6px; color: var(--muted); }
+  .timeline strong { color: var(--text); margin-right: 6px; }
+  .error { color: var(--red); margin-top: 6px; }
+  .flex-col { display: flex; flex-direction: column; gap: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trade Settlement Control Centre</h1>
+  <div class="env-switch">
+    <div class="pill active" data-env="PROD">PROD</div>
+    <div class="pill" data-env="UAT">UAT</div>
+    <div class="pill" data-env="DR">DR</div>
+    <span class="timestamp" id="timestamp"></span>
+  </div>
+</header>
+<main>
+  <section class="panel flow">
+    <div class="panel-title">Process Flow</div>
+    <div class="flow-diagram" id="flow"></div>
+    <div class="flow-arrows">
+      <div class="arrow"></div>
+      <div class="arrow"></div>
+      <div class="arrow"></div>
+      <div class="arrow"></div>
+    </div>
+  </section>
+  <section class="flex-col">
+    <div class="panel">
+      <div class="panel-title">KPIs</div>
+      <div class="tiles" id="tiles"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Trades</div>
+      <div class="filters">
+        <select id="stageFilter"></select>
+        <select id="statusFilter"></select>
+        <input type="text" id="searchFilter" placeholder="Search Trade ID / Instrument" />
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Trade ID</th><th>Instrument</th><th>Side</th><th>Qty</th><th>Notional</th><th>Current Stage</th><th>Status</th><th>Age</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div id="emptyState" style="display:none; padding:12px; color: var(--muted);">No trades match the filters.</div>
+      </div>
+      <div class="details" id="details">
+        <h3>Selected Trade Details</h3>
+        <div id="detailBody" style="color: var(--muted);">Select a trade to view its journey.</div>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+(() => {
+  const stages = [
+    "Order Management System",
+    "Broker",
+    "Settlement Orchestrator",
+    "Core Engine / Bookkeeping",
+    "Settlement System"
+  ];
+  const slas = {
+    "Order Management System": 10,
+    "Broker": 20,
+    "Settlement Orchestrator": 30,
+    "Core Engine / Bookkeeping": 20,
+    "Settlement System": 40
+  };
+  const filters = { stage: "ALL", status: "ALL", search: "" };
+  const trades = generateMockTrades();
+  let selectedTradeId = null;
+
+  function randBetween(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // Mock trade generator
+  function generateMockTrades() {
+    const instruments = ["AAPL", "MSFT", "TSLA", "DBS", "HSBC", "AMZN", "NVDA", "SAP", "BABA", "VOD"]; 
+    const side = ["BUY", "SELL"];
+    const now = Date.now();
+    const data = [];
+    for (let i = 1; i <= 20; i++) {
+      const createdAt = new Date(now - randBetween(20, 240) * 1000);
+      const stageIndex = randBetween(0, stages.length - 1);
+      const statusOptions = stageIndex === stages.length - 1 ? ["SETTLED", "FAILED", "IN-PROGRESS"] : ["NEW", "IN-PROGRESS", "FAILED"];
+      const status = pick(statusOptions);
+      const qty = randBetween(50, 500) * 10;
+      const price = randBetween(10, 350) + Math.random();
+      const instrument = pick(instruments);
+      const history = buildHistory(stageIndex, createdAt);
+      data.push({
+        id: `T2025-${String(i).padStart(4, "0")}`,
+        instrument,
+        side: pick(side),
+        quantity: qty,
+        notional: +(qty * price).toFixed(2),
+        currentStage: stages[stageIndex],
+        status,
+        createdAt,
+        stageEnteredAt: history[history.length - 1].timestamp,
+        history,
+        error: status === "FAILED" ? generateError() : null
+      });
+    }
+    return data;
+  }
+
+  function buildHistory(stageIndex, createdAt) {
+    const entries = [];
+    let cursor = new Date(createdAt);
+    for (let i = 0; i <= stageIndex; i++) {
+      cursor = new Date(cursor.getTime() + randBetween(2, 12) * 1000);
+      entries.push({ stage: stages[i], timestamp: cursor, message: stageMessage(stages[i]) });
+    }
+    return entries;
+  }
+
+  function stageMessage(stage) {
+    const map = {
+      "Order Management System": "Received in OMS",
+      "Broker": "Routed to Broker",
+      "Settlement Orchestrator": "Sent to Orchestrator",
+      "Core Engine / Bookkeeping": "Booked in core",
+      "Settlement System": "Settled"
+    };
+    return map[stage] || stage;
+  }
+
+  function generateError() {
+    const errors = [
+      "Broker rejection: price outside limits.",
+      "Settlement rejected: insufficient securities.",
+      "Orchestrator timeout waiting for confirmation.",
+      "Core booking validation failed.",
+      "Counterparty mismatch in settlement system."
+    ];
+    return pick(errors);
+  }
+
+  // Rendering helpers
+  function formatAge(date) {
+    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (diff < 60) return `${diff}s`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ${diff % 60}s`;
+    return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`;
+  }
+
+  function healthForStage(stage) {
+    const stageTrades = trades.filter(t => t.currentStage === stage);
+    const failed = stageTrades.some(t => t.status === "FAILED");
+    const delayed = stageTrades.some(t => t.status === "IN-PROGRESS" && secondsInStage(t) > slas[stage]);
+    if (failed) return "red";
+    if (delayed) return "amber";
+    return "green";
+  }
+
+  function secondsInStage(trade) {
+    return Math.floor((Date.now() - trade.stageEnteredAt.getTime()) / 1000);
+  }
+
+  function renderFlow() {
+    const container = document.getElementById("flow");
+    container.innerHTML = "";
+    stages.forEach(stage => {
+      const count = trades.filter(t => t.currentStage === stage).length;
+      const health = healthForStage(stage);
+      const div = document.createElement("div");
+      div.className = `stage ${health}`;
+      if (selectedTradeId) {
+        const selected = trades.find(t => t.id === selectedTradeId);
+        if (selected && selected.currentStage === stage) div.classList.add("selected");
+      }
+      const delayedCount = trades.filter(t => t.currentStage === stage && t.status === "IN-PROGRESS" && secondsInStage(t) > slas[stage]).length;
+      const failedCount = trades.filter(t => t.currentStage === stage && t.status === "FAILED").length;
+      div.innerHTML = `
+        <div class="name">${stage}</div>
+        <div class="count" style="background:${health === 'green' ? 'rgba(41,196,109,0.15)' : health === 'amber' ? 'rgba(242,169,0,0.15)' : 'rgba(255,95,95,0.15)'}; color:${health === 'green' ? 'var(--green)' : health === 'amber' ? 'var(--amber)' : 'var(--red)'};">${count} trade${count !== 1 ? 's' : ''}</div>
+        <span class="status">SLA: ${slas[stage]}s · Delayed: ${delayedCount} · Failed: ${failedCount}</span>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  function renderTiles() {
+    const tileData = computeKPIs();
+    const container = document.getElementById("tiles");
+    container.innerHTML = "";
+    tileData.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "tile";
+      div.innerHTML = `<div class="label">${item.label}</div><div class="value">${item.value}</div><div class="sub">${item.sub}</div>`;
+      container.appendChild(div);
+    });
+  }
+
+  function computeKPIs() {
+    const total = trades.length;
+    const settled = trades.filter(t => t.status === "SETTLED").length;
+    const failed = trades.filter(t => t.status === "FAILED").length;
+    const inflight = trades.filter(t => t.status === "IN-PROGRESS" || t.status === "NEW").length;
+    const avgLatency = (() => {
+      const completed = trades.filter(t => t.status === "SETTLED");
+      if (!completed.length) return "--";
+      const sum = completed.reduce((acc, t) => acc + Math.max(1, (t.history[t.history.length - 1].timestamp - t.createdAt) / 1000), 0);
+      return `${Math.round(sum / completed.length)}s`;
+    })();
+    return [
+      { label: "Total trades", value: total, sub: "All trades today" },
+      { label: "In-flight", value: inflight, sub: "Not yet settled" },
+      { label: "Settled", value: settled, sub: "Completed successfully" },
+      { label: "Failed", value: failed, sub: "Require attention" },
+      { label: "Avg latency", value: avgLatency, sub: "OMS → Settled" }
+    ];
+  }
+
+  function renderFilters() {
+    const stageSelect = document.getElementById("stageFilter");
+    stageSelect.innerHTML = `<option value="ALL">Stage: All</option>` + stages.map(s => `<option value="${s}">${s}</option>`).join("");
+    const statusSelect = document.getElementById("statusFilter");
+    const statuses = ["ALL", "NEW", "IN-PROGRESS", "SETTLED", "FAILED", "CANCELLED"];
+    statusSelect.innerHTML = statuses.map(s => `<option value="${s}">${s === 'ALL' ? 'Status: All' : s}</option>`).join("");
+  }
+
+  function applyFilters() {
+    const search = filters.search.toLowerCase();
+    return trades.filter(t => {
+      const matchesStage = filters.stage === "ALL" || t.currentStage === filters.stage;
+      const matchesStatus = filters.status === "ALL" || t.status === filters.status;
+      const matchesSearch = t.id.toLowerCase().includes(search) || t.instrument.toLowerCase().includes(search);
+      return matchesStage && matchesStatus && matchesSearch;
+    });
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById("tableBody");
+    const rows = applyFilters();
+    tbody.innerHTML = "";
+    document.getElementById("emptyState").style.display = rows.length ? "none" : "block";
+    rows.forEach(trade => {
+      const tr = document.createElement("tr");
+      if (trade.id === selectedTradeId) tr.classList.add("selected");
+      tr.innerHTML = `
+        <td>${trade.id}</td>
+        <td>${trade.instrument}</td>
+        <td>${trade.side}</td>
+        <td>${trade.quantity.toLocaleString()}</td>
+        <td>$${trade.notional.toLocaleString()}</td>
+        <td>${trade.currentStage}</td>
+        <td><span class="status-pill status-${trade.status}">${trade.status}</span></td>
+        <td>${formatAge(trade.createdAt)}</td>`;
+      tr.addEventListener("click", () => selectTrade(trade.id));
+      tbody.appendChild(tr);
+    });
+  }
+
+  function selectTrade(id) {
+    selectedTradeId = id;
+    renderTable();
+    renderFlow();
+    renderDetails();
+  }
+
+  function renderDetails() {
+    const container = document.getElementById("detailBody");
+    const trade = trades.find(t => t.id === selectedTradeId);
+    if (!trade) { container.innerHTML = "Select a trade to view its journey."; return; }
+    const checkpoints = trade.history
+      .map(h => `<li><strong>${h.timestamp.toLocaleTimeString()}</strong> ${h.message}</li>`) 
+      .join("");
+    container.innerHTML = `
+      <div style="display:flex; gap:20px; flex-wrap:wrap;">
+        <div><strong>ID</strong><br>${trade.id}</div>
+        <div><strong>Instrument</strong><br>${trade.instrument}</div>
+        <div><strong>Side</strong><br>${trade.side}</div>
+        <div><strong>Notional</strong><br>$${trade.notional.toLocaleString()}</div>
+        <div><strong>Stage</strong><br>${trade.currentStage}</div>
+      </div>
+      <ul class="timeline">${checkpoints}</ul>
+      ${trade.status === 'FAILED' ? `<div class="error">${trade.error}</div>` : ""}
+    `;
+  }
+
+  // Simulation tick
+  function tick() {
+    trades.forEach(trade => {
+      if (trade.status === "SETTLED" || trade.status === "FAILED") return;
+      const elapsed = secondsInStage(trade);
+      const sla = slas[trade.currentStage];
+      const shouldProgress = Math.random() < 0.25 || elapsed > sla + 10;
+      if (shouldProgress) advanceTrade(trade);
+    });
+    render();
+  }
+
+  function advanceTrade(trade) {
+    const currentIndex = stages.indexOf(trade.currentStage);
+    if (Math.random() < 0.08) {
+      trade.status = "FAILED";
+      trade.error = generateError();
+    } else if (currentIndex >= stages.length - 1) {
+      trade.status = "SETTLED";
+    } else {
+      trade.status = "IN-PROGRESS";
+      trade.currentStage = stages[currentIndex + 1];
+      trade.stageEnteredAt = new Date();
+      trade.history.push({ stage: trade.currentStage, timestamp: trade.stageEnteredAt, message: stageMessage(trade.currentStage) });
+    }
+  }
+
+  function render() {
+    renderFlow();
+    renderTiles();
+    renderTable();
+    renderDetails();
+    document.documentElement.style.setProperty('--accent', accentForEnv(currentEnv));
+    updateTimestamp();
+  }
+
+  function accentForEnv(env) {
+    return env === 'PROD' ? '#00c2ff' : env === 'UAT' ? '#8f7df9' : '#ff8f00';
+  }
+
+  // Environment switching
+  let currentEnv = 'PROD';
+  document.querySelectorAll('.pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      currentEnv = pill.dataset.env;
+      document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p === pill));
+      document.body.style.boxShadow = `inset 0 0 0 2px ${accentForEnv(currentEnv)}10`;
+      render();
+    });
+  });
+
+  function updateTimestamp() {
+    const now = new Date();
+    document.getElementById('timestamp').textContent = `Last refresh: ${now.toLocaleTimeString()}`;
+  }
+
+  // Event listeners for filters
+  document.getElementById('stageFilter').addEventListener('change', e => { filters.stage = e.target.value; renderTable(); });
+  document.getElementById('statusFilter').addEventListener('change', e => { filters.status = e.target.value; renderTable(); });
+  document.getElementById('searchFilter').addEventListener('input', e => { filters.search = e.target.value; renderTable(); });
+
+  // Kick off
+  renderFilters();
+  render();
+  setInterval(tick, 4000);
+  setInterval(render, 60000); // refresh timestamp/minor visuals
+})();
+</script>
+</body>
+</html>
