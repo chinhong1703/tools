@@ -5,6 +5,7 @@ import java.util.List;
 public record CsvMappingOptions(
         boolean trimHeaders,
         boolean exactHeaderMatch,
+        boolean headerCaseInsensitive,
         boolean ignoreUnknownColumns,
         List<String> datePatterns
 ) {
@@ -12,6 +13,7 @@ public record CsvMappingOptions(
         return new CsvMappingOptions(
                 true,
                 true,
+                false,
                 true,
                 List.of(
                         "yyyyMMdd",
@@ -22,6 +24,17 @@ public record CsvMappingOptions(
                         "dd-MM-yyyy HH:mm:ss",
                         "dd/MM/yyyy HH:mm:ss"
                 )
+        );
+    }
+
+    public static CsvMappingOptions spreadsheetDefaults() {
+        CsvMappingOptions defaults = defaults();
+        return new CsvMappingOptions(
+                defaults.trimHeaders(),
+                defaults.exactHeaderMatch(),
+                true,
+                defaults.ignoreUnknownColumns(),
+                defaults.datePatterns()
         );
     }
 }

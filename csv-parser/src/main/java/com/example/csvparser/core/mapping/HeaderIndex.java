@@ -44,7 +44,7 @@ public class HeaderIndex {
         if (options.trimHeaders()) {
             normalized = normalized.trim();
         }
-        if (!options.exactHeaderMatch()) {
+        if (options.headerCaseInsensitive() || !options.exactHeaderMatch()) {
             normalized = normalized.toLowerCase(Locale.ROOT);
         }
         return normalized;

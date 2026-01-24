@@ -1,24 +1,38 @@
-# Generic CSV Parser Component
+# Generic CSV & Spreadsheet Parser Component
 
-This module provides a reusable CSV ingestion service for Spring Boot applications. It maps CSV headers to POJO fields using annotations, supports configurable CSV formats, collects row-level errors without failing fast, and records idempotent processing using a checksum and database persistence.
+This module provides reusable CSV and Excel ingestion services for Spring Boot applications. It maps headers to POJO fields using annotations, supports configurable formats, collects row-level errors without failing fast, and records idempotent processing using a checksum and database persistence.
 
 ## Features
 
-- **Annotation-driven mapping**: map CSV headers to fields via `@CsvColumn` with optional trimming and per-field date formats.
-- **Configurable parsing**: delimiter, quote, escape, and charset options with UTF-8 BOM handling.
+- **Annotation-driven mapping**: map CSV headers or spreadsheet columns to fields via `@CsvColumn` with optional trimming and per-field date formats.
+- **Configurable parsing**: CSV delimiter/quote/escape/charset options with UTF-8 BOM handling; Excel sheet/section templates.
 - **Row-level error capture**: continue on error and return structured errors with row/column context.
 - **Idempotent processing**: SHA-256 checksum + database tracking keyed by object key + checksum.
 - **Optional Bean Validation**: automatically validates parsed records when Jakarta Validation is present.
+- **Excel support**: key-value labels plus a tabular section per sheet, formula evaluation, and date-aware cell parsing.
 
-## Dependency
+## Dependencies
 
-The module uses uniVocity parsers for robust CSV handling.
+The module uses uniVocity for CSV parsing and Apache POI for Excel parsing.
 
 ```xml
 <dependency>
   <groupId>com.univocity</groupId>
   <artifactId>univocity-parsers</artifactId>
   <version>2.9.1</version>
+</dependency>
+```
+
+```xml
+<dependency>
+  <groupId>org.apache.poi</groupId>
+  <artifactId>poi</artifactId>
+  <version>5.3.0</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.poi</groupId>
+  <artifactId>poi-ooxml</artifactId>
+  <version>5.3.0</version>
 </dependency>
 ```
 
@@ -104,6 +118,7 @@ new CsvFormatOptions(
 new CsvMappingOptions(
   true,  // trimHeaders
   true,  // exactHeaderMatch
+  false, // headerCaseInsensitive
   true,  // ignoreUnknownColumns
   List.of("yyyyMMdd", "dd-MM-yyyy", "dd/MM/yyyy", "yyyy-MM-dd")
 );
@@ -125,6 +140,64 @@ The ingestion result includes:
 - `status`: `PROCESSED`, `SKIPPED_ALREADY_PROCESSED`, or `FAILED`.
 
 Row numbering is 1-based, with the header row at row 1 and the first data row at row 2.
+
+## Spreadsheet ingestion (Excel)
+
+The spreadsheet ingestion API mirrors the CSV flow but uses a template describing key-value labels and a tabular section per sheet.
+
+### Example layout
+
+- B2: **Trade Date** label; B3: value
+- B5: **Settlement date** label; B6: value
+- B7..H7: table headers; data rows below
+
+### Template definition
+
+```java
+import com.example.csvparser.spreadsheet.core.template.*;
+
+SpreadsheetTemplate template = new SpreadsheetTemplate(List.of(
+  new SectionTemplate(
+    "Trades",
+    SheetSelector.byName("Sheet1"),
+    new KeyValueBlock(
+      List.of(
+        new KeyValueFieldMapping("Trade Date", new RelativeCellRef(1, 0), "Trade Date", true),
+        new KeyValueFieldMapping("Settlement date", new RelativeCellRef(1, 0), "Settlement date", true)
+      ),
+      LabelSearchOptions.defaults()
+    ),
+    new TableBlock(
+      new HeaderLocator(7, null, null),  // header row is 1-based
+      new ColumnRange("B", "H"),
+      null,
+      null,
+      true
+    )
+  )
+));
+```
+
+### Spreadsheet ingestion request
+
+```java
+import com.example.csvparser.spreadsheet.core.*;
+
+SpreadsheetIngestionRequest request = new SpreadsheetIngestionRequest(
+  "trades.xlsx",
+  contentBytes,
+  false,
+  SpreadsheetOptions.defaults(),
+  template,
+  CsvMappingOptions.spreadsheetDefaults(),
+  new CsvValidationOptions(true)
+);
+
+SpreadsheetIngestionService service = new DefaultSpreadsheetIngestionService(new JpaProcessingRegistry(repository));
+IngestionResult<TradeRow> result = service.ingest(request, TradeRow.class);
+```
+
+Spreadsheet errors include sheet name and cell address in the error message for easier debugging.
 
 ## Idempotency tracking
 

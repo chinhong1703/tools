@@ -170,7 +170,7 @@ public class DefaultCsvIngestionService implements CsvIngestionService {
         if (options.trimHeaders()) {
             normalized = normalized.trim();
         }
-        if (!options.exactHeaderMatch()) {
+        if (options.headerCaseInsensitive() || !options.exactHeaderMatch()) {
             normalized = normalized.toLowerCase();
         }
         return normalized;

@@ -115,7 +115,7 @@ class DefaultCsvIngestionServiceTest {
     @Test
     void usesFieldLevelDateFormats() {
         DefaultCsvIngestionService service = new DefaultCsvIngestionService(new JpaProcessingRegistry(repository));
-        CsvMappingOptions options = new CsvMappingOptions(true, true, true, List.of("yyyyMMdd"));
+        CsvMappingOptions options = new CsvMappingOptions(true, true, false, true, List.of("yyyyMMdd"));
         String csv = "id,name,birthDate\n" +
                 "1,Alice,25-12-2025\n";
         CsvIngestionRequest request = new CsvIngestionRequest(
