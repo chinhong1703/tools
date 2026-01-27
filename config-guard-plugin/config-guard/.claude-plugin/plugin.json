@@ -1,0 +1,5 @@
+{
+  "name": "config-guard",
+  "version": "1.0.0",
+  "description": "Stop-hook quality gate for configuration files"
+}
