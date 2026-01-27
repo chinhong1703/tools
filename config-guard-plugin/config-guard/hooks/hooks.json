@@ -1,0 +1,9 @@
+{
+  "hooks": [
+    {
+      "type": "command",
+      "event": "Stop",
+      "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config-stop.mjs"
+    }
+  ]
+}
