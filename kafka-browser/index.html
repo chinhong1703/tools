@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kafka Browser</title>
+  <style>
+    :root {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      color: #1f2937;
+      background: #f8fafc;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+
+    .section {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+      margin-bottom: 16px;
+    }
+
+    .section h2 {
+      font-size: 16px;
+      margin: 0 0 12px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #cbd5f5;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #f8fafc;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 64px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #2563eb;
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      border-color: #94a3b8;
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    button.danger {
+      border-color: #dc2626;
+      background: #dc2626;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .status {
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      font-size: 12px;
+    }
+
+    .status.connected { background: #dcfce7; }
+    .status.consuming { background: #dbeafe; }
+    .status.error { background: #fee2e2; }
+
+    .messages {
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px;
+      background: #ffffff;
+    }
+
+    .message {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 8px 4px;
+    }
+
+    .message:last-child {
+      border-bottom: none;
+    }
+
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    .preview {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #0f172a;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    details {
+      margin-top: 6px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: #2563eb;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      font-size: 11px;
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Kafka Browser</h1>
+
+  <div class="section">
+    <h2>Connection</h2>
+    <div class="grid two">
+      <div>
+        <label for="brokers">Brokers (comma-separated)</label>
+        <input id="brokers" type="text" placeholder="localhost:9092" />
+      </div>
+      <div>
+        <label for="clientId">Client ID (optional)</label>
+        <input id="clientId" type="text" placeholder="auto" />
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top: 12px;">
+      <div>
+        <label><input id="tlsEnabled" type="checkbox" /> TLS enabled</label>
+      </div>
+      <div>
+        <label><input id="saslEnabled" type="checkbox" /> SASL enabled</label>
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top: 12px;">
+      <div>
+        <label>Truststore file</label>
+        <input id="truststoreFile" type="file" />
+      </div>
+      <div>
+        <label>Truststore type</label>
+        <select id="truststoreType">
+          <option value="auto">Auto-detect</option>
+          <option value="jks">JKS</option>
+          <option value="pkcs12">PKCS12 (.p12)</option>
+        </select>
+      </div>
+      <div>
+        <label for="truststorePassword">Truststore password</label>
+        <input id="truststorePassword" type="password" />
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top: 12px;">
+      <div>
+        <label>Keystore file (for mTLS)</label>
+        <input id="keystoreFile" type="file" />
+      </div>
+      <div>
+        <label>Keystore type</label>
+        <select id="keystoreType">
+          <option value="auto">Auto-detect</option>
+          <option value="jks">JKS</option>
+          <option value="pkcs12">PKCS12 (.p12)</option>
+        </select>
+      </div>
+      <div>
+        <label for="keystorePassword">Keystore password</label>
+        <input id="keystorePassword" type="password" />
+      </div>
+      <div>
+        <label for="keyPassword">Key password (optional)</label>
+        <input id="keyPassword" type="password" />
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top: 12px;">
+      <div>
+        <label>Mechanism</label>
+        <select id="saslMechanism">
+          <option value="plain">PLAIN</option>
+          <option value="scram-sha-256">SCRAM-SHA-256</option>
+          <option value="scram-sha-512">SCRAM-SHA-512</option>
+        </select>
+      </div>
+      <div>
+        <label for="saslUsername">SASL username</label>
+        <input id="saslUsername" type="text" />
+      </div>
+      <div>
+        <label for="saslPassword">SASL password</label>
+        <input id="saslPassword" type="password" />
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top: 12px;">
+      <div>
+        <label>Topic</label>
+        <input id="topic" type="text" placeholder="your-topic" />
+      </div>
+      <div>
+        <label>Topics list</label>
+        <select id="topicsList">
+          <option value="">--</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top: 12px;">
+      <button id="connectBtn">Connect</button>
+      <button id="disconnectBtn" class="secondary">Disconnect</button>
+      <button id="listTopicsBtn" class="secondary">List Topics</button>
+      <div id="status" class="status">Idle</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Consume</h2>
+    <div class="row">
+      <button id="startConsumeBtn">Start</button>
+      <button id="stopConsumeBtn" class="secondary">Stop</button>
+      <label>From
+        <select id="fromSelect">
+          <option value="latest" selected>Latest</option>
+          <option value="earliest">Earliest</option>
+        </select>
+      </label>
+      <label>Limit
+        <input id="limit" type="number" min="1" value="500" />
+      </label>
+      <label>Search
+        <input id="search" type="text" placeholder="filter messages" />
+      </label>
+      <label>Order
+        <select id="orderSelect">
+          <option value="oldest" selected>Newest last</option>
+          <option value="newest">Newest first</option>
+        </select>
+      </label>
+      <button id="clearBtn" class="secondary">Clear</button>
+    </div>
+    <div class="messages" id="messages"></div>
+  </div>
+
+  <div class="section">
+    <h2>Produce</h2>
+    <div class="grid two">
+      <div>
+        <label for="produceKey">Key (optional)</label>
+        <input id="produceKey" type="text" />
+      </div>
+      <div>
+        <label>Format</label>
+        <select id="formatSelect">
+          <option value="plain" selected>Plain</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top: 8px;">
+      <label for="produceValue">Value</label>
+      <textarea id="produceValue"></textarea>
+    </div>
+    <div class="row" style="margin-top: 8px;">
+      <button id="sendBtn">Send</button>
+      <div id="produceStatus" class="status">Idle</div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      ws: null,
+      connected: false,
+      messages: [],
+      limit: 500,
+      dropped: 0
+    };
+
+    const elements = {
+      brokers: document.getElementById('brokers'),
+      clientId: document.getElementById('clientId'),
+      tlsEnabled: document.getElementById('tlsEnabled'),
+      truststoreFile: document.getElementById('truststoreFile'),
+      truststoreType: document.getElementById('truststoreType'),
+      truststorePassword: document.getElementById('truststorePassword'),
+      keystoreFile: document.getElementById('keystoreFile'),
+      keystoreType: document.getElementById('keystoreType'),
+      keystorePassword: document.getElementById('keystorePassword'),
+      keyPassword: document.getElementById('keyPassword'),
+      saslEnabled: document.getElementById('saslEnabled'),
+      saslMechanism: document.getElementById('saslMechanism'),
+      saslUsername: document.getElementById('saslUsername'),
+      saslPassword: document.getElementById('saslPassword'),
+      topic: document.getElementById('topic'),
+      topicsList: document.getElementById('topicsList'),
+      connectBtn: document.getElementById('connectBtn'),
+      disconnectBtn: document.getElementById('disconnectBtn'),
+      listTopicsBtn: document.getElementById('listTopicsBtn'),
+      status: document.getElementById('status'),
+      startConsumeBtn: document.getElementById('startConsumeBtn'),
+      stopConsumeBtn: document.getElementById('stopConsumeBtn'),
+      fromSelect: document.getElementById('fromSelect'),
+      limit: document.getElementById('limit'),
+      search: document.getElementById('search'),
+      orderSelect: document.getElementById('orderSelect'),
+      clearBtn: document.getElementById('clearBtn'),
+      messages: document.getElementById('messages'),
+      produceKey: document.getElementById('produceKey'),
+      formatSelect: document.getElementById('formatSelect'),
+      produceValue: document.getElementById('produceValue'),
+      sendBtn: document.getElementById('sendBtn'),
+      produceStatus: document.getElementById('produceStatus')
+    };
+
+    function setStatus(stateName, details) {
+      elements.status.className = `status ${stateName}`;
+      elements.status.textContent = details ? `${stateName}: ${details}` : stateName;
+    }
+
+    function setProduceStatus(text, isError) {
+      elements.produceStatus.className = `status ${isError ? 'error' : ''}`;
+      elements.produceStatus.textContent = text;
+    }
+
+    function detectStoreType(file, selectorValue) {
+      if (selectorValue !== 'auto') {
+        return selectorValue;
+      }
+      const name = file?.name || '';
+      if (name.endsWith('.p12') || name.endsWith('.pfx')) {
+        return 'pkcs12';
+      }
+      return 'jks';
+    }
+
+    function readFileBase64(file) {
+      if (!file) return Promise.resolve(null);
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const arrayBuffer = reader.result;
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          bytes.forEach((b) => {
+            binary += String.fromCharCode(b);
+          });
+          resolve(btoa(binary));
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function normalizeMessageValue(msg) {
+      const encoding = msg.valueEncoding || 'utf8';
+      const text = msg.value || '';
+      if (encoding === 'base64') {
+        return { text, encoding, display: '[base64]' };
+      }
+      return { text, encoding, display: text };
+    }
+
+    function messagePreview(text) {
+      if (!text) return '';
+      return text.length > 120 ? text.slice(0, 120) + '…' : text;
+    }
+
+    function renderMessages() {
+      const filter = elements.search.value.toLowerCase();
+      const ordered = elements.orderSelect.value === 'newest'
+        ? [...state.messages].reverse()
+        : state.messages;
+
+      const filtered = filter
+        ? ordered.filter((msg) => (msg.value || '').toLowerCase().includes(filter) || (msg.key || '').toLowerCase().includes(filter))
+        : ordered;
+
+      elements.messages.innerHTML = '';
+      filtered.forEach((msg) => {
+        const container = document.createElement('div');
+        container.className = 'message';
+
+        const header = document.createElement('div');
+        header.className = 'message-header';
+        const ts = msg.timestamp ? new Date(Number(msg.timestamp)).toLocaleString() : 'N/A';
+        header.innerHTML = `<span>${ts}</span><span>partition ${msg.partition} · offset ${msg.offset}</span>`;
+
+        const keyPreview = msg.key ? `<span class="pill">key: ${messagePreview(msg.key)}</span>` : '';
+        const valueInfo = normalizeMessageValue(msg);
+        const preview = document.createElement('div');
+        preview.className = 'preview';
+        preview.innerHTML = `${keyPreview}<div>${messagePreview(valueInfo.display)}</div>`;
+
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = 'Show full message';
+        details.appendChild(summary);
+
+        const content = document.createElement('pre');
+        content.style.whiteSpace = 'pre-wrap';
+        content.style.margin = '8px 0 0';
+
+        if (valueInfo.encoding === 'base64') {
+          content.textContent = `Base64: ${valueInfo.text}`;
+        } else {
+          try {
+            const parsed = JSON.parse(valueInfo.text);
+            content.textContent = JSON.stringify(parsed, null, 2);
+          } catch (error) {
+            content.textContent = valueInfo.text;
+          }
+        }
+
+        details.appendChild(content);
+        container.appendChild(header);
+        container.appendChild(preview);
+        container.appendChild(details);
+        elements.messages.appendChild(container);
+      });
+    }
+
+    function addMessage(msg) {
+      state.messages.push(msg);
+      if (state.messages.length > state.limit) {
+        state.messages = state.messages.slice(state.messages.length - state.limit);
+      }
+      renderMessages();
+    }
+
+    function connectWs() {
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        return;
+      }
+      const ws = new WebSocket(`ws://${window.location.host}/ws`);
+      state.ws = ws;
+
+      ws.onopen = () => {
+        setStatus('idle', 'Ready');
+      };
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'status') {
+          setStatus(data.state, data.details || '');
+        }
+        if (data.type === 'topics') {
+          elements.topicsList.innerHTML = '<option value="">--</option>';
+          data.topics.forEach((topic) => {
+            const option = document.createElement('option');
+            option.value = topic;
+            option.textContent = topic;
+            elements.topicsList.appendChild(option);
+          });
+        }
+        if (data.type === 'message') {
+          addMessage(data.msg);
+        }
+        if (data.type === 'produce_result') {
+          if (data.ok) {
+            setProduceStatus('Sent', false);
+          } else {
+            setProduceStatus(data.error || 'Send failed', true);
+          }
+        }
+        if (data.type === 'error') {
+          setStatus('error', data.error?.message || 'Error');
+        }
+      };
+      ws.onclose = () => {
+        setStatus('idle', 'Disconnected');
+      };
+    }
+
+    async function handleConnect() {
+      connectWs();
+      const brokers = elements.brokers.value.split(',').map((b) => b.trim()).filter(Boolean);
+      if (!brokers.length) {
+        setStatus('error', 'Brokers required');
+        return;
+      }
+      const truststoreFile = elements.truststoreFile.files[0];
+      const keystoreFile = elements.keystoreFile.files[0];
+
+      const truststoreBytes = await readFileBase64(truststoreFile);
+      const keystoreBytes = await readFileBase64(keystoreFile);
+
+      const config = {
+        brokers,
+        clientId: elements.clientId.value || undefined,
+        tls: {
+          enabled: elements.tlsEnabled.checked,
+          truststore: truststoreBytes ? {
+            bytesBase64: truststoreBytes,
+            filename: truststoreFile.name,
+            storePassword: elements.truststorePassword.value,
+            storeType: detectStoreType(truststoreFile, elements.truststoreType.value)
+          } : null,
+          keystore: keystoreBytes ? {
+            bytesBase64: keystoreBytes,
+            filename: keystoreFile.name,
+            storePassword: elements.keystorePassword.value,
+            keyPassword: elements.keyPassword.value,
+            storeType: detectStoreType(keystoreFile, elements.keystoreType.value)
+          } : null
+        },
+        sasl: {
+          enabled: elements.saslEnabled.checked,
+          mechanism: elements.saslMechanism.value,
+          username: elements.saslUsername.value,
+          password: elements.saslPassword.value
+        },
+        topic: elements.topic.value || elements.topicsList.value || undefined,
+        from: elements.fromSelect.value
+      };
+
+      state.ws.send(JSON.stringify({ type: 'connect', config }));
+    }
+
+    function handleDisconnect() {
+      if (!state.ws) return;
+      state.ws.send(JSON.stringify({ type: 'disconnect' }));
+    }
+
+    function handleListTopics() {
+      if (!state.ws) {
+        connectWs();
+      }
+      state.ws.send(JSON.stringify({ type: 'list_topics' }));
+    }
+
+    function handleStartConsume() {
+      if (!state.ws) {
+        connectWs();
+      }
+      const topic = elements.topic.value || elements.topicsList.value;
+      if (topic) {
+        elements.topic.value = topic;
+      }
+      state.limit = Number(elements.limit.value) || 500;
+      state.ws.send(JSON.stringify({ type: 'start_consume' }));
+    }
+
+    function handleStopConsume() {
+      if (!state.ws) return;
+      state.ws.send(JSON.stringify({ type: 'stop_consume' }));
+    }
+
+    function handleClear() {
+      state.messages = [];
+      renderMessages();
+    }
+
+    function handleSend() {
+      if (!state.ws) {
+        connectWs();
+      }
+      const topic = elements.topic.value || elements.topicsList.value;
+      const value = elements.produceValue.value.trim();
+      if (!topic) {
+        setProduceStatus('Topic required', true);
+        return;
+      }
+      if (!value) {
+        setProduceStatus('Value required', true);
+        return;
+      }
+
+      let payload = value;
+      if (elements.formatSelect.value === 'json') {
+        try {
+          const parsed = JSON.parse(value);
+          payload = JSON.stringify(parsed);
+          elements.produceValue.value = JSON.stringify(parsed, null, 2);
+        } catch (error) {
+          setProduceStatus('Invalid JSON', true);
+          return;
+        }
+      }
+
+      state.ws.send(JSON.stringify({
+        type: 'produce',
+        record: {
+          topic,
+          key: elements.produceKey.value || undefined,
+          value: payload
+        }
+      }));
+    }
+
+    elements.connectBtn.addEventListener('click', () => {
+      handleConnect();
+    });
+    elements.disconnectBtn.addEventListener('click', handleDisconnect);
+    elements.listTopicsBtn.addEventListener('click', handleListTopics);
+    elements.startConsumeBtn.addEventListener('click', handleStartConsume);
+    elements.stopConsumeBtn.addEventListener('click', handleStopConsume);
+    elements.clearBtn.addEventListener('click', handleClear);
+    elements.sendBtn.addEventListener('click', handleSend);
+    elements.search.addEventListener('input', renderMessages);
+    elements.orderSelect.addEventListener('change', renderMessages);
+    elements.limit.addEventListener('change', () => {
+      state.limit = Number(elements.limit.value) || 500;
+    });
+    elements.topicsList.addEventListener('change', () => {
+      if (elements.topicsList.value) {
+        elements.topic.value = elements.topicsList.value;
+      }
+    });
+
+    connectWs();
+  </script>
+</body>
+</html>
