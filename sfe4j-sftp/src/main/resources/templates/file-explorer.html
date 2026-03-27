@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title th:text="${title}">SFE4J</title></head>
+<body>
+<h2 th:text="${title}">Interface Server Explorer</h2>
+<p th:text="${description}"></p>
+<p>Current directory: <code th:text="${tree.currentDirectory}"></code></p>
+<div th:if="${tree.parentDirectory != null}">
+    <a th:href="@{/file-explorer(dir=${tree.parentDirectory})}">.. (parent)</a>
+</div>
+<h3>Directories</h3>
+<ul>
+    <li th:each="d : ${tree.childDirectories}">
+        <a th:href="@{/file-explorer(dir=${d.path})}" th:text="${d.name}"></a>
+    </li>
+</ul>
+<h3>Files</h3>
+<ul>
+    <li th:each="f : ${tree.files}">
+        <span th:text="${f.name}"></span>
+        [<a th:href="@{/file-viewer(file=${f.path})}">view</a>]
+        [<a th:href="@{/file-downloader(file=${f.path})}">download</a>]
+    </li>
+</ul>
+</body>
+</html>
