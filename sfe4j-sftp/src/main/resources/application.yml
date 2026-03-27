@@ -1,0 +1,22 @@
+sfe4j:
+  mode: sftp
+  title: "Interface Server Explorer"
+  description: "Read-only remote file browser"
+  restrict-to-base-dir: true
+  base-dir-path: "/remote/base"
+  preview:
+    max-bytes: 2097152
+
+sftp:
+  host: interface-server.example
+  port: 22
+  username: myuser
+  private-key:
+    path: /etc/keys/interface_id_rsa
+    passphrase: ""
+  known-hosts:
+    path: /etc/ssh/known_hosts
+  connect-timeout-ms: 5000
+  auth-timeout-ms: 10000
+  session-idle-timeout-ms: 300000
+  allow-insecure-host-key-verifier: false
